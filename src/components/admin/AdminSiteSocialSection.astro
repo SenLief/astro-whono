@@ -12,7 +12,7 @@ const { socialCustomLimit } = Astro.props;
 type SocialIconOption = {
   value: SiteSocialIconKey;
   optionLabel: string;
-  savedLabel: string;
+  defaultLabel: string;
 };
 
 type SocialPresetRow = {
@@ -26,26 +26,24 @@ type SocialPresetRow = {
   placeholder: string;
 };
 
-const defaultCustomSocialIconKey: SiteSocialIconKey = 'website';
 const socialIconOptions: readonly SocialIconOption[] = [
-  { value: 'github', optionLabel: 'GitHub', savedLabel: 'GitHub' },
-  { value: 'x', optionLabel: 'X', savedLabel: 'X' },
-  { value: 'email', optionLabel: 'Email', savedLabel: 'Email' },
-  { value: 'weibo', optionLabel: '微博', savedLabel: '微博' },
-  { value: 'facebook', optionLabel: 'Facebook', savedLabel: 'Facebook' },
-  { value: 'instagram', optionLabel: 'Instagram', savedLabel: 'Instagram' },
-  { value: 'telegram', optionLabel: 'Telegram', savedLabel: 'Telegram' },
-  { value: 'mastodon', optionLabel: 'Mastodon', savedLabel: 'Mastodon' },
-  { value: 'bilibili', optionLabel: 'Bilibili', savedLabel: 'Bilibili' },
-  { value: 'youtube', optionLabel: 'YouTube', savedLabel: 'YouTube' },
-  { value: 'linkedin', optionLabel: 'LinkedIn', savedLabel: 'LinkedIn' },
-  { value: 'website', optionLabel: '网站', savedLabel: '网站' },
-  { value: 'link', optionLabel: '链接', savedLabel: '链接' },
-  { value: 'globe', optionLabel: '站点', savedLabel: '站点' }
+  { value: 'github', optionLabel: 'GitHub', defaultLabel: 'GitHub' },
+  { value: 'x', optionLabel: 'X', defaultLabel: 'X' },
+  { value: 'email', optionLabel: 'Email', defaultLabel: 'Email' },
+  { value: 'weibo', optionLabel: '微博', defaultLabel: '微博' },
+  { value: 'facebook', optionLabel: 'Facebook', defaultLabel: 'Facebook' },
+  { value: 'instagram', optionLabel: 'Instagram', defaultLabel: 'Instagram' },
+  { value: 'telegram', optionLabel: 'Telegram', defaultLabel: 'Telegram' },
+  { value: 'mastodon', optionLabel: 'Mastodon', defaultLabel: 'Mastodon' },
+  { value: 'bilibili', optionLabel: 'Bilibili', defaultLabel: 'Bilibili' },
+  { value: 'youtube', optionLabel: 'YouTube', defaultLabel: 'YouTube' },
+  { value: 'linkedin', optionLabel: 'LinkedIn', defaultLabel: 'LinkedIn' },
+  { value: 'website', optionLabel: '网站', defaultLabel: '网站' }
 ];
 const customSocialIconOptions = socialIconOptions.filter(
   (option) => option.value !== 'github' && option.value !== 'x' && option.value !== 'email'
 );
+const defaultCustomSocialIconKey: SiteSocialIconKey = customSocialIconOptions[0]?.value ?? 'website';
 const socialPresetRows: readonly SocialPresetRow[] = [
   {
     id: 'github',
@@ -97,12 +95,12 @@ const socialPresetRows: readonly SocialPresetRow[] = [
     </div>
     <div class="admin-social-table">
       <div id="site-social-custom-head" class="admin-social-header" aria-hidden="true">
-        <span>位置</span>
-        <span>平台</span>
-        <span>链接代号</span>
-        <span>图标</span>
-        <span>链接地址</span>
-        <span>操作</span>
+        <span class="admin-social-header__order">位置</span>
+        <span class="admin-social-header__platform">平台</span>
+        <span class="admin-social-header__id">链接代号</span>
+        <span class="admin-social-header__icon">图标</span>
+        <span class="admin-social-header__href">链接地址</span>
+        <span class="admin-social-header__actions">操作</span>
       </div>
       <div id="site-social-custom-list" class="admin-social-list">
         {socialPresetRows.map((row) => <AdminSocialPresetRow row={row} />)}

@@ -10,7 +10,6 @@ import {
   type HomeIntroLinkKey,
   type SidebarNavId,
   type SiteSocialCustomItem,
-  type SiteSocialIconKey,
   type ThemeSettings
 } from '../../../lib/theme-settings';
 import {
@@ -43,8 +42,8 @@ import {
   isAdminHomeIntroLinkKey,
   isAdminSidebarDividerVariant,
   isAdminNavId,
-  isAdminSocialIconKey,
-  normalizeAdminHeroImageSrc
+  normalizeAdminHeroImageSrc,
+  normalizeAdminSocialIconKey
 } from '../../../lib/admin-console/shared';
 
 type WritableGroup = 'site' | 'shell' | 'home' | 'page' | 'ui';
@@ -284,8 +283,8 @@ const parseSocialCustomItem = (
   const href = toHttpsUrl(value.href);
   if (!href) errors.push(`${scope}.href 必须是合法 https:// 链接`);
 
-  const iconKeyRaw = toTrimmedString(value.iconKey);
-  if (!iconKeyRaw || !isAdminSocialIconKey(iconKeyRaw)) {
+  const iconKey = normalizeAdminSocialIconKey(value.iconKey);
+  if (!iconKey) {
     errors.push(`${scope}.iconKey 必须来自白名单`);
   }
 
@@ -295,7 +294,7 @@ const parseSocialCustomItem = (
   const order = toInteger(value.order);
   if (order === undefined) errors.push(`${scope}.order 必须是整数`);
 
-  if (!id || !label || !href || !iconKeyRaw || visible === undefined || order === undefined) {
+  if (!id || !label || !href || !iconKey || visible === undefined || order === undefined) {
     return null;
   }
 
@@ -303,7 +302,7 @@ const parseSocialCustomItem = (
     id,
     label,
     href,
-    iconKey: iconKeyRaw as SiteSocialIconKey,
+    iconKey,
     visible,
     order
   };

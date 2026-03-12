@@ -149,6 +149,15 @@
     padding: 12px;
   }
 
+  .admin-social-field--order,
+  .admin-social-field--platform,
+  .admin-social-field--id,
+  .admin-social-field--icon,
+  .admin-social-field--href,
+  .admin-social-field--actions {
+    grid-column: auto;
+  }
+
   .admin-social-field--order input {
     width: 100%;
     max-width: 3ch;
@@ -157,6 +166,14 @@
   .admin-social-field--platform,
   .admin-social-field--icon {
     justify-items: start;
+  }
+
+  .admin-social-link-inline {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-social-row[data-custom-label-visible='true'] .admin-social-link-inline {
+    grid-template-columns: 1fr;
   }
 
   .admin-social-field--platform select {

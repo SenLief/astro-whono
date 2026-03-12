@@ -90,9 +90,7 @@ export const ADMIN_SOCIAL_ICON_KEYS = [
   'bilibili',
   'youtube',
   'linkedin',
-  'website',
-  'link',
-  'globe'
+  'website'
 ] as const satisfies readonly SiteSocialIconKey[];
 export const ADMIN_SOCIAL_ICON_KEY_SET: ReadonlySet<SiteSocialIconKey> = new Set(ADMIN_SOCIAL_ICON_KEYS);
 
@@ -127,6 +125,14 @@ export const isAdminHomeIntroLinkKey = (value: string): value is HomeIntroLinkKe
 
 export const isAdminSocialPresetId = (value: string): value is SiteSocialPresetId =>
   (ADMIN_SOCIAL_PRESET_IDS as readonly string[]).includes(value);
+
+export const normalizeAdminSocialIconKey = (value: unknown): SiteSocialIconKey | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  if (normalized === 'link' || normalized === 'globe') return 'website';
+  return ADMIN_SOCIAL_ICON_KEY_SET.has(normalized as SiteSocialIconKey) ? (normalized as SiteSocialIconKey) : undefined;
+};
 
 export const isAdminSocialIconKey = (value: string): value is SiteSocialIconKey =>
   ADMIN_SOCIAL_ICON_KEY_SET.has(value as SiteSocialIconKey);

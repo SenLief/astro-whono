@@ -40,6 +40,7 @@ import {
   isAdminNavId,
   isAdminSocialIconKey,
   isAdminSocialPresetId,
+  normalizeAdminSocialIconKey,
   normalizeAdminHeroImageSrc
 } from '@/lib/admin-console/shared';
 
@@ -210,25 +211,40 @@ if (!root) {
     const getPresetRows = (): HTMLElement[] => queryAll<HTMLElement>(socialCustomList, '[data-social-preset-row]');
     const getCustomRows = (): HTMLElement[] => queryAll<HTMLElement>(socialCustomList, '[data-social-custom-row]');
     const deepClone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-    const defaultCustomSocialIconKey: SiteSocialIconKey = 'website';
+    const fallbackCustomSocialIconKey: SiteSocialIconKey = 'website';
     const customSocialOptionElements = queryAll<HTMLOptionElement>(
       socialCustomTemplate.content,
       '[data-social-custom-field="iconKey"] option'
     );
+    const customSocialIconOrder = Array.from(
+      new Set(
+        customSocialOptionElements.map(
+          (option) => normalizeAdminSocialIconKey(option.value) ?? fallbackCustomSocialIconKey
+        )
+      )
+    ) as SiteSocialIconKey[];
+    const defaultCustomSocialIconKey: SiteSocialIconKey =
+      customSocialIconOrder[0] ?? fallbackCustomSocialIconKey;
     const customSocialIconKeys = new Set<SiteSocialIconKey>(
       customSocialOptionElements.map((option) => {
-        const value = option.value.trim();
-        return isAdminSocialIconKey(value) ? value : defaultCustomSocialIconKey;
+        return normalizeAdminSocialIconKey(option.value) ?? defaultCustomSocialIconKey;
       })
     );
     const customSocialIconLabels = new Map<SiteSocialIconKey, string>(
       customSocialOptionElements.map((option) => {
-        const rawValue = option.value.trim();
-        const value = isAdminSocialIconKey(rawValue) ? rawValue : defaultCustomSocialIconKey;
-        const label = option.getAttribute('data-social-label')?.trim() || option.textContent?.trim() || '链接';
+        const value = normalizeAdminSocialIconKey(option.value) ?? defaultCustomSocialIconKey;
+        const label =
+          option.getAttribute('data-social-default-label')?.trim() || option.textContent?.trim() || '链接';
         return [value, label];
       })
     );
+    const getDefaultCustomSocialLabel = (iconKey: SiteSocialIconKey): string =>
+      customSocialIconLabels.get(iconKey)
+      || customSocialIconLabels.get(fallbackCustomSocialIconKey)
+      || customSocialIconLabels.get(defaultCustomSocialIconKey)
+      || '链接';
+    const isEditableCustomLabelIconKey = (iconKey: SiteSocialIconKey): boolean =>
+      iconKey === fallbackCustomSocialIconKey;
 
     const getPresetRowId = (row: Element | null): SiteSocialPresetId => {
       const value = row?.getAttribute('data-social-preset-id')?.trim() ?? 'github';
@@ -265,8 +281,21 @@ if (!root) {
       const rawValue = normalizeTrimmed(value);
       return rawValue || ADMIN_HERO_IMAGE_ALT_DEFAULT;
     };
-    const normalizeCustomSocialLabel = (iconKey: SiteSocialIconKey): string =>
-      customSocialIconLabels.get(iconKey) || customSocialIconLabels.get(defaultCustomSocialIconKey) || '链接';
+    const normalizeCustomSocialLabel = (value: unknown, iconKey: SiteSocialIconKey): string => {
+      if (!isEditableCustomLabelIconKey(iconKey)) {
+        return getDefaultCustomSocialLabel(iconKey);
+      }
+      const normalized = normalizeTrimmed(value);
+      return normalized || getDefaultCustomSocialLabel(iconKey);
+    };
+    const getDisplayCustomSocialLabel = (value: unknown, iconKey: SiteSocialIconKey): string => {
+      const normalized = normalizeTrimmed(value);
+      if (!isEditableCustomLabelIconKey(iconKey)) {
+        return normalized || getDefaultCustomSocialLabel(iconKey);
+      }
+      const defaultLabel = getDefaultCustomSocialLabel(iconKey);
+      return normalized && normalized !== defaultLabel ? normalized : '';
+    };
     const defaultHomeIntroLinks = [...ADMIN_HOME_INTRO_LINK_DEFAULT] as HomeIntroLinkKey[];
     const defaultPrimaryHomeIntroLink: HomeIntroLinkKey = ADMIN_HOME_INTRO_LINK_DEFAULT[0];
     const defaultSecondaryHomeIntroLink: HomeIntroLinkKey = ADMIN_HOME_INTRO_LINK_DEFAULT[1];
@@ -431,7 +460,7 @@ if (!root) {
     };
     const getCustomFieldTarget = (
       index: number,
-      field: 'order' | 'iconKey' | 'id' | 'href'
+      field: 'order' | 'iconKey' | 'id' | 'label' | 'href'
     ) => (): HTMLElement | null => {
       const row = getCustomRows()[index] ?? null;
       return row ? query<HTMLElement>(row, `[data-social-custom-field="${field}"]`) : null;
@@ -536,21 +565,19 @@ if (!root) {
       footerYearRangeEl.dataset.currentYearEnabled = String(Boolean(inputSiteFooterShowCurrentYear.checked));
     };
 
-    const getSelectedSocialOption = (selectEl: HTMLSelectElement | null): HTMLOptionElement | null =>
-      selectEl?.selectedOptions?.[0] ?? null;
-
-    const getSocialOptionLabel = (selectEl: HTMLSelectElement | null): string => {
-      const option = getSelectedSocialOption(selectEl);
-      return option?.getAttribute('data-social-label')?.trim() || option?.textContent?.trim() || '链接';
-    };
-
     const getCustomRowIconKey = (row: Element | null): SiteSocialIconKey => {
       const select = row ? query<HTMLSelectElement>(row, '[data-social-custom-field="iconKey"]') : null;
-      const value = select?.value.trim() ?? defaultCustomSocialIconKey;
-      return customSocialIconKeys.has(value as SiteSocialIconKey)
-        ? (value as SiteSocialIconKey)
-        : defaultCustomSocialIconKey;
+      const value = normalizeAdminSocialIconKey(select?.value);
+      return value && customSocialIconKeys.has(value) ? value : defaultCustomSocialIconKey;
     };
+    const getNextDefaultCustomSocialIconKey = (): SiteSocialIconKey => {
+      const usedIconKeys = new Set(getCustomRows().map((row) => getCustomRowIconKey(row)));
+      return customSocialIconOrder.find((iconKey) => !usedIconKeys.has(iconKey)) || defaultCustomSocialIconKey;
+    };
+    const getCustomRowLabelInput = (row: Element | null): HTMLInputElement | null =>
+      row ? query<HTMLInputElement>(row, '[data-social-custom-field="label"]') : null;
+    const getCustomRowLabelField = (row: Element | null): HTMLElement | null =>
+      row ? query<HTMLElement>(row, '.admin-social-link-label') : null;
 
     const getPresetRowHrefInput = (row: Element | null): HTMLInputElement | null =>
       row ? query<HTMLInputElement>(row, '[data-social-preset-field="href"]') : null;
@@ -657,6 +684,8 @@ if (!root) {
     };
 
     const getStoredGeneratedCustomId = (row: HTMLElement | null): string => row?.dataset.generatedId?.trim() || '';
+    const getStoredGeneratedCustomLabel = (row: HTMLElement | null): string =>
+      row?.dataset.generatedLabel?.trim() || '';
 
     const applyGeneratedCustomId = (row: HTMLElement | null, nextId: string): void => {
       const idInput = row ? query<HTMLInputElement>(row, '[data-social-custom-field="id"]') : null;
@@ -666,6 +695,14 @@ if (!root) {
       row.dataset.generatedId = nextId;
       row.dataset.idManual = 'false';
     };
+    const applyGeneratedCustomLabel = (row: HTMLElement | null, nextLabel: string): void => {
+      const labelInput = getCustomRowLabelInput(row);
+      if (!(labelInput instanceof HTMLInputElement) || !row) return;
+
+      labelInput.value = getDisplayCustomSocialLabel(nextLabel, getCustomRowIconKey(row));
+      row.dataset.generatedLabel = nextLabel;
+      row.dataset.labelManual = 'false';
+    };
 
     const shouldAutoSyncCustomId = (row: HTMLElement | null): boolean => {
       const idInput = row ? query<HTMLInputElement>(row, '[data-social-custom-field="id"]') : null;
@@ -674,6 +711,14 @@ if (!root) {
       const trimmed = idInput.value.trim();
       const generatedId = getStoredGeneratedCustomId(row);
       return row.dataset.idManual !== 'true' || !trimmed || Boolean(generatedId && trimmed === generatedId);
+    };
+    const shouldAutoSyncCustomLabel = (row: HTMLElement | null): boolean => {
+      const labelInput = getCustomRowLabelInput(row);
+      if (!(labelInput instanceof HTMLInputElement) || !row) return false;
+
+      const trimmed = labelInput.value.trim();
+      const generatedLabel = getStoredGeneratedCustomLabel(row);
+      return row.dataset.labelManual !== 'true' || !trimmed || Boolean(generatedLabel && trimmed === generatedLabel);
     };
 
     const getNextSocialOrder = (): number => {
@@ -731,14 +776,65 @@ if (!root) {
       }
     };
 
-    const syncCustomRow = (row: HTMLElement, options: { syncId?: boolean } = {}): void => {
-      const { syncId = false } = options;
+    const finalizeCustomLabelInput = (
+      row: HTMLElement,
+      options: { regenerateIfEmpty?: boolean } = {}
+    ): void => {
+      const { regenerateIfEmpty = true } = options;
+      const labelInput = getCustomRowLabelInput(row);
+      if (!(labelInput instanceof HTMLInputElement)) return;
+
+      const trimmed = labelInput.value.trim();
+      const nextGeneratedLabel = getDefaultCustomSocialLabel(getCustomRowIconKey(row));
+      const generatedLabel = getStoredGeneratedCustomLabel(row) || nextGeneratedLabel;
+      row.dataset.generatedLabel = nextGeneratedLabel;
+      if (!trimmed && regenerateIfEmpty) {
+        applyGeneratedCustomLabel(row, nextGeneratedLabel);
+      } else {
+        labelInput.value = getDisplayCustomSocialLabel(trimmed, getCustomRowIconKey(row));
+        row.dataset.labelManual = trimmed && trimmed !== generatedLabel ? 'true' : 'false';
+      }
+    };
+
+    const syncCustomLabelField = (
+      row: HTMLElement,
+      options: { syncValue?: boolean } = {}
+    ): void => {
+      const { syncValue = false } = options;
+      const labelField = getCustomRowLabelField(row);
+      const iconKey = getCustomRowIconKey(row);
+      const editable = isEditableCustomLabelIconKey(iconKey);
+      row.dataset.customLabelVisible = String(editable);
+      if (labelField instanceof HTMLElement) {
+        labelField.hidden = !editable;
+      }
+
+      if (!editable) {
+        applyGeneratedCustomLabel(row, getDefaultCustomSocialLabel(iconKey));
+        return;
+      }
+
+      if (syncValue) {
+        const nextGeneratedLabel = getDefaultCustomSocialLabel(iconKey);
+        if (shouldAutoSyncCustomLabel(row)) {
+          applyGeneratedCustomLabel(row, nextGeneratedLabel);
+        } else {
+          row.dataset.generatedLabel = nextGeneratedLabel;
+        }
+      }
+    };
+
+    const syncCustomRow = (row: HTMLElement, options: { syncId?: boolean; syncLabel?: boolean } = {}): void => {
+      const { syncId = false, syncLabel = false } = options;
       const idInput = query<HTMLInputElement>(row, '[data-social-custom-field="id"]');
       if (!(idInput instanceof HTMLInputElement)) return;
+      const iconKey = getCustomRowIconKey(row);
 
       if (syncId && shouldAutoSyncCustomId(row)) {
-        applyGeneratedCustomId(row, generateCustomId(row));
+        applyGeneratedCustomId(row, generateCustomId(row, iconKey));
       }
+
+      syncCustomLabelField(row, { syncValue: syncLabel });
 
       syncCustomIconPreview(row);
       syncCustomVisibilityButton(row);
@@ -762,6 +858,7 @@ if (!root) {
       if (!(row instanceof HTMLElement)) return null;
 
       const idInput = query<HTMLInputElement>(row, '[data-social-custom-field="id"]');
+      const labelInput = getCustomRowLabelInput(row);
       const hrefInput = query<HTMLInputElement>(row, '[data-social-custom-field="href"]');
       const iconInput = query<HTMLSelectElement>(row, '[data-social-custom-field="iconKey"]');
       const orderInput = query<HTMLInputElement>(row, '[data-social-custom-field="order"]');
@@ -769,6 +866,7 @@ if (!root) {
 
       if (
         !(idInput instanceof HTMLInputElement) ||
+        !(labelInput instanceof HTMLInputElement) ||
         !(hrefInput instanceof HTMLInputElement) ||
         !(iconInput instanceof HTMLSelectElement) ||
         !(orderInput instanceof HTMLInputElement) ||
@@ -778,12 +876,29 @@ if (!root) {
       }
 
       row.dataset.idManual = manualId ? 'true' : 'false';
+      const initialIconKey =
+        typeof item?.iconKey === 'string'
+          ? normalizeAdminSocialIconKey(item.iconKey) ?? fallbackCustomSocialIconKey
+          : getNextDefaultCustomSocialIconKey();
+      const initialLabel = normalizeCustomSocialLabel(item?.label, initialIconKey);
+      const initialDisplayLabel = getDisplayCustomSocialLabel(initialLabel, initialIconKey);
       idInput.value = item?.id ? String(item.id).trim() : '';
+      labelInput.value = initialDisplayLabel;
       hrefInput.value = item?.href ? String(item.href).trim() : '';
-      iconInput.value = item?.iconKey && isAdminSocialIconKey(item.iconKey) ? item.iconKey : defaultCustomSocialIconKey;
+      iconInput.value = initialIconKey;
       orderInput.value = String(parseOrder(item?.order, index + 1));
       visibleInput.checked = item?.visible !== false;
-      syncCustomRow(row, { syncId: !item?.id });
+      row.dataset.generatedLabel = getDefaultCustomSocialLabel(initialIconKey);
+      row.dataset.labelManual =
+        isEditableCustomLabelIconKey(initialIconKey)
+        && initialDisplayLabel
+        && initialLabel !== row.dataset.generatedLabel
+          ? 'true'
+          : 'false';
+      syncCustomRow(row, {
+        syncId: !item?.id,
+        syncLabel: isEditableCustomLabelIconKey(initialIconKey) && !item?.label
+      });
       row.dataset.generatedId = idInput.value.trim();
 
       return row;
@@ -816,11 +931,10 @@ if (!root) {
       const normalizedCustom: EditableCustomSocialItem[] = customItems
         .map((item, index) => {
           const record = isRecord(item) ? item : {};
-          const rawIconKey = normalizeTrimmed(record.iconKey);
-          const iconKey = isAdminSocialIconKey(rawIconKey) ? rawIconKey : defaultCustomSocialIconKey;
+          const iconKey = normalizeAdminSocialIconKey(record.iconKey) ?? defaultCustomSocialIconKey;
           const sortableItem: SortableCustomItem = {
             id: normalizeTrimmed(record.id),
-            label: normalizeCustomSocialLabel(iconKey),
+            label: normalizeCustomSocialLabel(record.label, iconKey),
             href: normalizeTrimmed(record.href),
             iconKey,
             visible: Boolean(record.visible),
@@ -968,15 +1082,15 @@ if (!root) {
 
       const custom = getCustomRows().map((row, index): EditableCustomSocialItem => {
         const idInput = query<HTMLInputElement>(row, '[data-social-custom-field="id"]');
+        const labelInput = getCustomRowLabelInput(row);
         const hrefInput = query<HTMLInputElement>(row, '[data-social-custom-field="href"]');
         const iconInput = query<HTMLSelectElement>(row, '[data-social-custom-field="iconKey"]');
         const orderInput = query<HTMLInputElement>(row, '[data-social-custom-field="order"]');
         const visibleInput = query<HTMLInputElement>(row, '[data-social-custom-field="visible"]');
-        const rawIconKey = iconInput?.value.trim() ?? '';
-        const iconKey = isAdminSocialIconKey(rawIconKey) ? rawIconKey : defaultCustomSocialIconKey;
+        const iconKey = normalizeAdminSocialIconKey(iconInput?.value) ?? defaultCustomSocialIconKey;
         return {
           id: idInput?.value.trim() || '',
-          label: getSocialOptionLabel(iconInput),
+          label: normalizeCustomSocialLabel(labelInput?.value, iconKey),
           href: hrefInput?.value.trim() || '',
           iconKey,
           order: parseOrder(orderInput?.value || '', index + 1),
@@ -1254,9 +1368,9 @@ if (!root) {
         }
 
         if (!item.label) {
-          pushIssue(`${rowLabel} 的显示名称不能为空`, getCustomFieldTarget(index, 'iconKey'));
+          pushIssue(`${rowLabel} 的显示名称不能为空`, getCustomFieldTarget(index, 'label'));
         } else if (item.label.includes('\n') || item.label.includes('\r')) {
-          pushIssue(`${rowLabel} 的显示名称只允许单行文本`, getCustomFieldTarget(index, 'iconKey'));
+          pushIssue(`${rowLabel} 的显示名称只允许单行文本`, getCustomFieldTarget(index, 'label'));
         }
 
         if (!item.href || !isAdminAllowedHttpsUrl(item.href)) {
@@ -1624,7 +1738,6 @@ if (!root) {
       const row = createCustomRow(
         {
           href: '',
-          iconKey: defaultCustomSocialIconKey,
           order: getNextSocialOrder(),
           visible: true
         },
@@ -1655,7 +1768,7 @@ if (!root) {
       if (!(row instanceof HTMLElement)) return;
 
       if (target.matches('[data-social-custom-field="iconKey"]')) {
-        syncCustomRow(row, { syncId: true });
+        syncCustomRow(row, { syncId: true, syncLabel: true });
         return;
       }
 
@@ -1674,22 +1787,36 @@ if (!root) {
         return;
       }
 
-      if (!(target instanceof HTMLInputElement) || !target.matches('[data-social-custom-field="id"]')) return;
+      if (!(target instanceof HTMLInputElement)) return;
       const row = target.closest('[data-social-custom-row]');
       if (!(row instanceof HTMLElement)) return;
-      const trimmed = target.value.trim();
-      const generatedId = getStoredGeneratedCustomId(row);
-      row.dataset.idManual = trimmed && trimmed !== generatedId ? 'true' : 'false';
+      if (target.matches('[data-social-custom-field="id"]')) {
+        const trimmed = target.value.trim();
+        const generatedId = getStoredGeneratedCustomId(row);
+        row.dataset.idManual = trimmed && trimmed !== generatedId ? 'true' : 'false';
+        return;
+      }
+      if (target.matches('[data-social-custom-field="label"]')) {
+        const trimmed = target.value.trim();
+        const generatedLabel = getStoredGeneratedCustomLabel(row);
+        row.dataset.labelManual = trimmed && trimmed !== generatedLabel ? 'true' : 'false';
+      }
     });
 
     socialCustomList.addEventListener('focusout', (event) => {
       const target = event.target;
-      if (!(target instanceof HTMLInputElement) || !target.matches('[data-social-custom-field="id"]')) {
+      if (!(target instanceof HTMLInputElement)) {
         return;
       }
       const row = target.closest('[data-social-custom-row]');
       if (!(row instanceof HTMLElement)) return;
-      finalizeCustomIdInput(row);
+      if (target.matches('[data-social-custom-field="id"]')) {
+        finalizeCustomIdInput(row);
+      } else if (target.matches('[data-social-custom-field="label"]')) {
+        finalizeCustomLabelInput(row);
+      } else {
+        return;
+      }
       refreshDirty();
     });
 

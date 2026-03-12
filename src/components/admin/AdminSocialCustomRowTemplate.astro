@@ -6,7 +6,7 @@ import Icon from '../Icon.astro';
 interface SocialIconOption {
   value: SiteSocialIconKey;
   optionLabel: string;
-  savedLabel: string;
+  defaultLabel: string;
 }
 
 interface Props {
@@ -41,7 +41,7 @@ const { socialIconOptions, customSocialIconOptions, defaultCustomSocialIconKey }
       <select data-social-custom-field="iconKey">
         {
           customSocialIconOptions.map((option) => (
-            <option value={option.value} data-social-label={option.savedLabel}>
+            <option value={option.value} data-social-default-label={option.defaultLabel}>
               {option.optionLabel}
             </option>
           ))
@@ -73,7 +73,26 @@ const { socialIconOptions, customSocialIconOptions, defaultCustomSocialIconKey }
 
     <label class="admin-field admin-social-field admin-social-field--href">
       <span class="admin-social-cell-label">链接地址</span>
-      <input data-social-custom-field="href" type="url" inputmode="url" autocomplete="off" placeholder="https://example.com" />
+      <span class="admin-social-link-inline">
+        <span class="admin-social-link-label" hidden>
+          <input
+            class="admin-social-link-label__input"
+            data-social-custom-field="label"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="自定义名称"
+          />
+        </span>
+        <input
+          class="admin-social-link-inline__href"
+          data-social-custom-field="href"
+          type="url"
+          inputmode="url"
+          autocomplete="off"
+          placeholder="https://example.com"
+        />
+      </span>
     </label>
 
     <div class="admin-social-field admin-social-field--actions">

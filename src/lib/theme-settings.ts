@@ -13,6 +13,7 @@ import {
   ADMIN_SIDEBAR_DIVIDER_DEFAULT,
   getAdminHeroImageLocalFilePath,
   isAdminSidebarDividerVariant,
+  normalizeAdminSocialIconKey,
   normalizeAdminHeroImageSrc
 } from './admin-console/shared';
 
@@ -37,9 +38,7 @@ export type SiteSocialIconKey =
   | 'bilibili'
   | 'youtube'
   | 'linkedin'
-  | 'website'
-  | 'link'
-  | 'globe';
+  | 'website';
 
 export interface SidebarNavItem {
   id: SidebarNavId;
@@ -371,22 +370,6 @@ const DEFAULT_UI: UiSettings = {
 };
 
 const NAV_IDS: ReadonlySet<SidebarNavId> = new Set(['essay', 'bits', 'memo', 'archive', 'about']);
-const SOCIAL_ICON_KEYS: ReadonlySet<SiteSocialIconKey> = new Set([
-  'github',
-  'x',
-  'email',
-  'weibo',
-  'facebook',
-  'instagram',
-  'telegram',
-  'mastodon',
-  'bilibili',
-  'youtube',
-  'linkedin',
-  'website',
-  'link',
-  'globe'
-]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const GITHUB_HOSTS = ['github.com'];
 const X_HOSTS = ['x.com', 'twitter.com'];
@@ -538,8 +521,7 @@ const asHomeIntroLinkKey = (value: unknown): HomeIntroLinkKey | undefined => {
 };
 
 const asSocialIconKey = (value: unknown): SiteSocialIconKey | undefined => {
-  if (typeof value !== 'string') return undefined;
-  return SOCIAL_ICON_KEYS.has(value as SiteSocialIconKey) ? (value as SiteSocialIconKey) : undefined;
+  return normalizeAdminSocialIconKey(value);
 };
 
 const resolveValue = <T>(
@@ -626,7 +608,7 @@ const parseSocialCustomItems = (value: unknown): SiteSocialCustomItem[] | undefi
       id,
       label,
       href,
-      iconKey: asSocialIconKey(row.iconKey) ?? 'link',
+      iconKey: asSocialIconKey(row.iconKey) ?? 'website',
       visible: asBoolean(row.visible) ?? true,
       order: asInteger(row.order) ?? index + 1
     });

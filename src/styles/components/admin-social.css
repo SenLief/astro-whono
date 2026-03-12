@@ -71,13 +71,32 @@
   font-size: 12px;
 }
 
-.admin-social-header > span:first-child,
-.admin-social-header > span:nth-child(2),
-.admin-social-header > span:nth-child(3),
-.admin-social-header > span:nth-child(4),
-.admin-social-header > span:nth-child(5),
-.admin-social-header > span:nth-child(6) {
+.admin-social-header > span {
   text-align: center;
+}
+
+.admin-social-header__order {
+  grid-column: 1;
+}
+
+.admin-social-header__platform {
+  grid-column: 2;
+}
+
+.admin-social-header__id {
+  grid-column: 3;
+}
+
+.admin-social-header__icon {
+  grid-column: 4;
+}
+
+.admin-social-header__href {
+  grid-column: 5;
+}
+
+.admin-social-header__actions {
+  grid-column: 6;
 }
 
 .admin-social-row {
@@ -105,20 +124,65 @@
   min-width: 0;
 }
 
-.admin-social-field--order,
-.admin-social-field--platform,
-.admin-social-field--icon {
+.admin-social-field--order {
+  grid-column: 1;
   justify-items: center;
 }
 
+.admin-social-field--platform {
+  grid-column: 2;
+  justify-items: center;
+}
+
+.admin-social-field--id {
+  grid-column: 3;
+  justify-items: center;
+}
+
+.admin-social-field--icon {
+  grid-column: 4;
+  justify-items: center;
+}
+
+.admin-social-field--href {
+  grid-column: 5;
+}
+
 .admin-social-field--actions {
+  grid-column: 6;
   display: grid;
   gap: 6px;
   justify-items: center;
 }
 
-.admin-social-field--id {
-  justify-items: center;
+.admin-social-link-inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.admin-social-row[data-custom-label-visible='true'] .admin-social-link-inline {
+  grid-template-columns: minmax(84px, 92px) minmax(0, 1fr);
+}
+
+.admin-social-link-label {
+  min-width: 0;
+}
+
+.admin-social-link-label[hidden] {
+  display: none;
+}
+
+.admin-social-link-label__input,
+.admin-social-link-inline__href {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-social-link-label__input {
+  text-align: center;
 }
 
 .admin-social-order-frame {
@@ -173,8 +237,9 @@
 }
 
 .admin-social-field--platform select {
-  width: min(100%, 96px);
-  margin-inline: auto;
+  width: 84px;
+  min-width: 0;
+  margin-inline: 0;
   padding-inline: 10px 22px;
   text-align: center;
   text-align-last: center;
@@ -205,8 +270,9 @@
 }
 
 .admin-social-field--platform .admin-social-static-input {
-  width: min(100%, 96px);
-  margin-inline: auto;
+  width: 84px;
+  min-width: 0;
+  margin-inline: 0;
   text-align: center;
 }
 
