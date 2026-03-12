@@ -187,6 +187,14 @@ Main routes:
 - List pages: `/archive/`, `/essay/`, `/bits/`, `/memo/`, `/about/`
 - Detail page: `/archive/[...slug]` (single canonical entry point)
 
+### Image Assets
+
+- Images inside article content: prefer `src/content/**` or `src/assets/**`, so Astro can process and optimize them during build
+- `/bits/` images: place them under `public/bits/**` and use the actual file path, for example `bits/demo-01.jpg`
+- Default avatar for `/bits/`: place it under `public/author/**` and use the actual file path, for example `author/your-avatar.png`
+- Home Hero: supports `src/assets/**`, `public/**`, and `https://` image URLs
+- If you need a public direct URL, or do not want Astro to process the asset, place it under `public/**`
+
 
 ### Core Frontmatter Fields
 

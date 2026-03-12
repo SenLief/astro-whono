@@ -187,6 +187,13 @@ npm run dev
 - 列表页：`/archive/`、`/essay/`、`/bits/`、`/memo/`、`/about/`
 - 详情页：`/archive/[...slug]`（唯一入口）
 
+### 图片资源
+
+- 文章正文图片：建议放 `src/content/**` 或 `src/assets/**`， Astro 在构建时可以参与处理优化
+- `/bits/` 配图：放 `public/bits/**`，并填写实际文件路径，例如 `bits/demo-01.jpg`
+- `/bits/` 默认头像：放 `public/author/**`，并填写实际文件路径，例如 `author/your-avatar.png`
+- 首页 Hero：支持 `src/assets/**`、`public/**` 和 `https://` 图片地址
+- 需要公共直链，或不希望经过 Astro 处理的图片：放 `public/**`
 
 ### 核心字段（Frontmatter）
 

@@ -1,5 +1,6 @@
 /* Layout
-   负责壳/导航/内容区/页面头与侧栏按钮；禁止放内容块（prose/callout/code-block/figure）或页面卡片样式。
+   负责壳/导航/内容区/页面头与侧栏按钮；禁止放内容块（prose/callout/code-block/figure）、
+   页面卡片样式或页面私有调优。
 */
 
 /* ===============================
@@ -141,10 +142,6 @@
   width: 100%;
 }
 
-.home--compact-start .content {
-  padding-top: 62px;
-}
-
 .content__inner {
   max-width: var(--max);
   display: flex;
@@ -226,23 +223,6 @@
   width: 16px;
   height: 16px;
   display: block;
-}
-
-.page-header.page-header--about {
-  align-items: flex-end;
-}
-
-.page-header.page-header--about .page-actions {
-  align-self: flex-end;
-  margin-left: 6px;
-  margin-right: 0;
-  gap: 6px;
-  transform: translateY(2px);
-}
-
-.page-header.page-header--about .icon-link .icon {
-  width: 18px;
-  height: 18px;
 }
 
 .page-header.page-header--essay {
@@ -441,10 +421,6 @@
     padding: calc(10px + env(safe-area-inset-top)) calc(var(--pad-x) + env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) calc(var(--pad-x) + env(safe-area-inset-left));
   }
 
-  .home--compact-start .content {
-    padding-top: calc(4px + env(safe-area-inset-top));
-  }
-
   .page-header {
     flex-direction: column;
     align-items: flex-start;
@@ -466,20 +442,6 @@
     align-self: flex-start;
   }
 
-  .page-header.page-header--about {
-    flex-direction: row;
-    align-items: flex-end;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .page-header.page-header--about .page-actions {
-    margin-left: 6px;
-    margin-right: 0;
-    align-self: flex-end;
-    transform: none;
-  }
-
   .page-header.page-header--essay {
     padding-left: 0;
   }
@@ -497,10 +459,6 @@
 
   .content {
     padding: calc(18px + env(safe-area-inset-top)) calc(var(--pad-x) + env(safe-area-inset-right)) calc(56px + env(safe-area-inset-bottom)) calc(var(--pad-x) + env(safe-area-inset-left));
-  }
-
-  .home--compact-start .content {
-    padding-top: calc(8px + env(safe-area-inset-top));
   }
 
   .nav a {
@@ -535,9 +493,6 @@
     padding: calc(4px + env(safe-area-inset-top)) calc(var(--pad-x) + env(safe-area-inset-right)) calc(36px + env(safe-area-inset-bottom)) calc(var(--pad-x) + env(safe-area-inset-left));
   }
 
-  .home--compact-start .content {
-    padding-top: calc(env(safe-area-inset-top));
-  }
 }
 
 /* 侧栏底部按钮组 */
@@ -819,12 +774,3 @@ body.immersive-page[data-reading="immersive"] .prose p {
   margin: 16px 0;
 }
 
-/* Memo 页面阅读增强：字号增幅更小 */
-body.memo-page[data-reading="immersive"] .prose {
-  font-size: 16px;
-  line-height: 1.85;
-}
-
-body.memo-page[data-reading="immersive"] .prose p {
-  margin: 14px 0;
-}

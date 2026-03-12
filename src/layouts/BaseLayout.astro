@@ -1,7 +1,7 @@
 ---
 import Sidebar from '../components/Sidebar.astro';
 import Icon from '../components/Icon.astro';
-import '../styles/global.css';
+import globalStylesHref from '../styles/global.css?url';
 import { hasSiteUrl } from '../../site.config.mjs';
 import { createWithBase } from '../utils/format';
 import { getThemeSettings } from '../lib/theme-settings';
@@ -12,6 +12,7 @@ const {
   image,
   ogType = 'website',
   bodyClass,
+  deferGlobalStyles = false,
 } = Astro.props;
 
 const { settings } = getThemeSettings();
@@ -70,6 +71,22 @@ const withBase = createWithBase(base);
     <meta name="twitter:title" content={fullTitle} />
     {metaDescription && <meta name="twitter:description" content={metaDescription} />}
     {ogImage && <meta name="twitter:image" content={ogImage} />}
+    {
+      deferGlobalStyles ? (
+        <>
+          <link rel="preload" href={globalStylesHref} as="style" />
+          <link
+            rel="stylesheet"
+            href={globalStylesHref}
+            media="print"
+            onload="this.onload=null;this.media='all'"
+          />
+          <noscript><link rel="stylesheet" href={globalStylesHref} /></noscript>
+        </>
+      ) : (
+        <link rel="stylesheet" href={globalStylesHref} />
+      )
+    }
     <slot name="head" />
   </head>
   <body class={bodyClass}>

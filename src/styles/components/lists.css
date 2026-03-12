@@ -1,5 +1,5 @@
 /* Lists
-   负责通用列表与归档布局；禁止放页面专属卡片。
+   负责通用列表与归档布局；禁止放页面专属卡片或页面私有间距调优。
 */
 
 .list {
@@ -7,10 +7,6 @@
   flex-direction: column;
   gap: 0;
   margin-top: 16px;
-}
-
-.home--compact-start .list {
-  margin-top: 10px;
 }
 
 .page-header.page-header--with-search {

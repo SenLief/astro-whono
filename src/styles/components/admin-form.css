@@ -175,6 +175,10 @@
   line-height: 1.7;
 }
 
+.admin-console--readonly .admin-hint {
+  margin-top: 30px;
+}
+
 .admin-banner {
   margin: 12px 0 0;
   padding: 8px 10px;
@@ -433,11 +437,13 @@
 }
 
 .admin-field input[type='number'] {
+  appearance: textfield;
   -moz-appearance: textfield;
 }
 
 .admin-field input[type='number']::-webkit-outer-spin-button,
 .admin-field input[type='number']::-webkit-inner-spin-button {
+  appearance: none;
   -webkit-appearance: none;
   margin: 0;
 }

@@ -118,7 +118,7 @@ const JSON_HEADERS = {
   'cache-control': 'no-store'
 };
 
-const ADMIN_READONLY_MESSAGE = 'Theme Console settings API is only available in development.';
+const ADMIN_READONLY_MESSAGE = 'Theme Console 仅在本地开发环境可写；生产环境保持只读。';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
