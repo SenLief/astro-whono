@@ -39,6 +39,7 @@ const {
 };
 
 const hasTagEntry = tagOptions.length > 0;
+const tagTriggerText = currentTag ? '切换标签' : '#标签';
 ---
 
 <div class={headerClass}>
@@ -55,7 +56,7 @@ const hasTagEntry = tagOptions.length > 0;
           aria-haspopup="dialog"
           aria-expanded="false"
         >
-          #标签
+          {tagTriggerText}
         </a>
       ) : null}
     </span>
@@ -88,10 +89,10 @@ const hasTagEntry = tagOptions.length > 0;
 {currentTag ? (
   <div class="entry-tag-current">
     <span class="entry-tag-current__pill">
-      <span>标签</span>
-      <strong>#{currentTag.label}</strong>
+      <Icon name="tag" class="entry-tag-current__icon" size={14} />
+      <strong class="entry-tag-current__label">#{currentTag.label}</strong>
     </span>
-    <a class="entry-tag-current__clear" href={currentTag.clearHref}>清除</a>
+    <a class="entry-tag-current__clear" href={currentTag.clearHref}>清除筛选</a>
   </div>
 ) : null}
 

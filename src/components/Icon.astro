@@ -13,6 +13,7 @@ type IconName =
   | 'code'
   | 'quote'
   | 'list'
+  | 'tag'
   | 'link'
   | 'paragraph'
   | 'map-pin'
@@ -388,6 +389,36 @@ const socialIconBody = Object.prototype.hasOwnProperty.call(socialIconBodies, no
   >
     <polyline points="16 18 22 12 16 6" />
     <polyline points="8 6 2 12 8 18" />
+  </svg>
+)}
+
+{name === 'tag' && (
+  <svg
+    class={className}
+    width={iconSize}
+    height={iconSize}
+    viewBox="0 0 24 24"
+    aria-hidden={ariaHidden}
+    aria-label={ariaLabel}
+    role={role}
+    focusable="false"
+  >
+    <path
+      d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3H4a1 1 0 0 0-1 1v5.59A2 2 0 0 0 3.59 11l9.58 9.58a2 2 0 0 0 2.83 0l4.59-4.59a2 2 0 0 0 0-2.83Z"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.6"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M7 7h.01"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
   </svg>
 )}
 

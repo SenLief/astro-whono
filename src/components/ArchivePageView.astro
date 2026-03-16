@@ -42,7 +42,6 @@ const pageTitleParts = [pageTitleText, currentTag ? `#${currentTag.label}` : nul
 const pageTitle = pageTitleParts.join(' · ');
 const subtitleText = joinPageSubtitleText(
   page.archive.subtitle,
-  currentTag ? `标签 #${currentTag.label}` : null,
   `共 ${resultCount} 篇内容`,
   totalPages > 1 ? `第 ${currentPage} / ${totalPages} 页` : null
 );
