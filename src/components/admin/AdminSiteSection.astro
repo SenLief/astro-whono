@@ -57,6 +57,7 @@ const { footerStartYearMin, footerStartYearMax, socialCustomLimit } = Astro.prop
         <span class="admin-year-range__sep" aria-hidden="true">-</span>
         <input
           class="admin-year-range__readonly"
+          name="site-footer-current-year-display"
           type="text"
           value={String(footerStartYearMax)}
           readonly

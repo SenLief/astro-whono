@@ -26,6 +26,7 @@ const { socialIconOptions, customSocialIconOptions, defaultCustomSocialIconKey }
         <span class="admin-social-order-frame__mark" aria-hidden="true">[</span>
         <input
           data-social-custom-field="order"
+          name="site-social-custom-order[]"
           type="number"
           min="1"
           max={String(ADMIN_SOCIAL_ORDER_MAX)}
@@ -38,7 +39,7 @@ const { socialIconOptions, customSocialIconOptions, defaultCustomSocialIconKey }
 
     <label class="admin-field admin-social-field admin-social-field--platform">
       <span class="admin-social-cell-label">平台</span>
-      <select data-social-custom-field="iconKey">
+      <select data-social-custom-field="iconKey" name="site-social-custom-icon-key[]">
         {
           customSocialIconOptions.map((option) => (
             <option value={option.value} data-social-default-label={option.defaultLabel}>
@@ -51,7 +52,13 @@ const { socialIconOptions, customSocialIconOptions, defaultCustomSocialIconKey }
 
     <label class="admin-field admin-social-field admin-social-field--id">
       <span class="admin-social-cell-label">链接代号</span>
-      <input data-social-custom-field="id" type="text" autocomplete="off" spellcheck="false" />
+      <input
+        data-social-custom-field="id"
+        name="site-social-custom-id[]"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+      />
     </label>
 
     <div class="admin-social-field admin-social-field--icon">
@@ -78,6 +85,7 @@ const { socialIconOptions, customSocialIconOptions, defaultCustomSocialIconKey }
           <input
             class="admin-social-link-label__input"
             data-social-custom-field="label"
+            name="site-social-custom-label[]"
             type="text"
             autocomplete="off"
             spellcheck="false"
@@ -87,6 +95,7 @@ const { socialIconOptions, customSocialIconOptions, defaultCustomSocialIconKey }
         <input
           class="admin-social-link-inline__href"
           data-social-custom-field="href"
+          name="site-social-custom-href[]"
           type="url"
           inputmode="url"
           autocomplete="off"
@@ -98,7 +107,12 @@ const { socialIconOptions, customSocialIconOptions, defaultCustomSocialIconKey }
     <div class="admin-social-field admin-social-field--actions">
       <span class="admin-social-cell-label">操作</span>
       <div class="admin-social-row-actions">
-        <input data-social-custom-field="visible" type="checkbox" class="sr-only" />
+        <input
+          data-social-custom-field="visible"
+          name="site-social-custom-visible[]"
+          type="checkbox"
+          class="sr-only"
+        />
         <button class="admin-social-action" type="button" data-social-custom-action="toggle-visible" aria-pressed="true">
           <Icon name="eye" class="admin-social-action__icon" size={15} />
           <span class="sr-only" data-social-custom-visible-label>隐藏链接</span>

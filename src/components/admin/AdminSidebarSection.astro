@@ -81,7 +81,15 @@ const { navIdOrder } = Astro.props;
               <span class="sr-only">{id} 排序</span>
               <span class="admin-social-order-frame admin-nav-order-frame">
                 <span class="admin-social-order-frame__mark" aria-hidden="true">[</span>
-                <input data-nav-field="order" type="number" min="1" step="1" inputmode="numeric" value={index + 1} />
+                <input
+                  data-nav-field="order"
+                  name={`shell-nav-${id}-order`}
+                  type="number"
+                  min="1"
+                  step="1"
+                  inputmode="numeric"
+                  value={index + 1}
+                />
                 <span class="admin-social-order-frame__mark" aria-hidden="true">]</span>
               </span>
             </label>
@@ -94,7 +102,7 @@ const { navIdOrder } = Astro.props;
               <span class="sr-only">{id} 导航名称</span>
               <span class="admin-nav-name-frame">
                 <span class="admin-nav-name-frame__mark" aria-hidden="true">&lt;</span>
-                <input data-nav-field="label" type="text" autocomplete="off" />
+                <input data-nav-field="label" name={`shell-nav-${id}-label`} type="text" autocomplete="off" />
                 <span class="admin-nav-name-frame__mark" aria-hidden="true">&gt;</span>
               </span>
             </label>
@@ -103,6 +111,7 @@ const { navIdOrder } = Astro.props;
               <span class="sr-only">{id} 导航后缀，留空表示不显示</span>
               <input
                 data-nav-field="ornament"
+                name={`shell-nav-${id}-ornament`}
                 type="text"
                 autocomplete="off"
                 maxlength={ADMIN_NAV_ORNAMENT_MAX_LENGTH}
@@ -112,7 +121,12 @@ const { navIdOrder } = Astro.props;
             <label class="admin-toggle">
               <span class="admin-nav-cell-label">是否展示</span>
               <span class="admin-toggle__control">
-                <input data-nav-field="visible" type="checkbox" aria-label={`${id} 是否显示`} />
+                <input
+                  data-nav-field="visible"
+                  name={`shell-nav-${id}-visible`}
+                  type="checkbox"
+                  aria-label={`${id} 是否显示`}
+                />
               </span>
             </label>
           </div>

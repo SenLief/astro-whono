@@ -1,60 +1,32 @@
 import type {
-  HomeIntroLinkKey,
-  SidebarDividerVariant,
   SidebarNavId,
-  SiteSocialIconKey,
-  SiteSocialPresetId,
-  ThemeSettingsEditablePayload
+  ThemeSettingsEditableErrorState,
+  ThemeSettingsEditablePayload,
+  ThemeSettingsReadDiagnostic
 } from '@/lib/theme-settings';
 import {
-  ADMIN_SOCIAL_ORDER_MAX,
-  ADMIN_SOCIAL_ORDER_MIN,
-  ADMIN_EMAIL_RE,
-  ADMIN_FOOTER_COPYRIGHT_MAX_LENGTH,
-  ADMIN_FOOTER_START_YEAR_MIN,
-  ADMIN_GITHUB_HOSTS,
-  ADMIN_HERO_IMAGE_ALT_DEFAULT,
-  ADMIN_HERO_IMAGE_ALT_MAX_LENGTH,
-  ADMIN_HERO_PRESET_SET,
-  ADMIN_HOME_INTRO_LINK_DEFAULT,
-  ADMIN_HOME_INTRO_LINK_LIMIT,
-  ADMIN_HOME_INTRO_LINK_OPTIONS,
-  ADMIN_HOME_INTRO_MAX_LENGTH,
-  ADMIN_LOCALE_RE,
   ADMIN_NAV_IDS,
-  ADMIN_NAV_ORNAMENT_DEFAULT,
-  ADMIN_NAV_ORNAMENT_MAX_LENGTH,
-  ADMIN_PAGE_TITLE_MAX_LENGTH,
-  ADMIN_PAGE_SUBTITLE_MAX_LENGTH,
-  ADMIN_SIDEBAR_DIVIDER_DEFAULT,
   ADMIN_SOCIAL_CUSTOM_LIMIT,
-  ADMIN_SOCIAL_PRESET_IDS,
-  ADMIN_SOCIAL_PRESET_ORDER_DEFAULT,
-  ADMIN_X_HOSTS,
-  getAdminSocialOrderIssues,
-  getAdminFooterStartYearMax,
-  isAdminHomeIntroLinkKey,
-  isAdminSidebarDividerVariant,
-  isAdminAllowedHttpsUrl,
-  isAdminHeroPresetId,
-  isAdminNavId,
-  isAdminSocialIconKey,
-  isAdminSocialPresetId,
-  normalizeAdminBitsAvatarPath,
-  normalizeAdminSocialIconKey,
-  normalizeAdminHeroImageSrc
+  getAdminFooterStartYearMax
 } from '@/lib/admin-console/shared';
+import { createFormCodec, type EditableSettings } from './form-codec';
+import { createSocialLinks } from './social-links';
+import { createValidation, type ValidationIssue } from './validation';
 
-type EditableSettings = ThemeSettingsEditablePayload['settings'];
 type RequiredElements<T extends Record<string, Element | null>> = { [K in keyof T]: NonNullable<T[K]> };
-type EditableCustomSocialItem = EditableSettings['site']['socialLinks']['custom'][number];
-type EditableNavItem = EditableSettings['shell']['nav'][number];
-type SocialPresetOrder = Record<SiteSocialPresetId, number>;
 type LoadSource = 'bootstrap' | 'remote';
 type LooseRecord = Record<string, unknown>;
-type ValidationIssue = {
-  message: string;
-  focusTarget?: () => HTMLElement | null;
+type AdminControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement;
+type ErrorBannerState = {
+  title: string;
+  message?: string;
+  items?: Array<string | HTMLElement>;
+  retryable?: boolean;
+};
+type ErrorBannerOptions = {
+  title?: string;
+  message?: string;
+  retryable?: boolean;
 };
 
 const root = document.querySelector<HTMLElement>('[data-admin-root]');
@@ -86,6 +58,10 @@ if (!root) {
     statusInlineEl: byId<HTMLElement>('admin-status-inline'),
     dirtyBanner: byId<HTMLElement>('admin-dirty-banner'),
     errorBanner: byId<HTMLElement>('admin-error-banner'),
+    errorTitleEl: byId<HTMLElement>('admin-error-title'),
+    errorMessageEl: byId<HTMLElement>('admin-error-message'),
+    errorListEl: byId<HTMLElement>('admin-error-list'),
+    errorRetryBtn: byId<HTMLButtonElement>('admin-error-retry'),
     validateBtn: byId<HTMLButtonElement>('admin-validate'),
     resetBtn: byId<HTMLButtonElement>('admin-reset'),
     saveBtn: byId<HTMLButtonElement>('admin-save'),
@@ -153,6 +129,10 @@ if (!root) {
       statusInlineEl,
       dirtyBanner,
       errorBanner,
+      errorTitleEl,
+      errorMessageEl,
+      errorListEl,
+      errorRetryBtn,
       validateBtn,
       resetBtn,
       saveBtn,
@@ -209,234 +189,193 @@ if (!root) {
     } = controls;
 
     const getNavRows = (): HTMLElement[] => queryAll<HTMLElement>(root, '[data-nav-id]');
-    const getPresetRows = (): HTMLElement[] => queryAll<HTMLElement>(socialCustomList, '[data-social-preset-row]');
-    const getCustomRows = (): HTMLElement[] => queryAll<HTMLElement>(socialCustomList, '[data-social-custom-row]');
     const deepClone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-    const fallbackCustomSocialIconKey: SiteSocialIconKey = 'website';
-    const customSocialOptionElements = queryAll<HTMLOptionElement>(
-      socialCustomTemplate.content,
-      '[data-social-custom-field="iconKey"] option'
-    );
-    const customSocialIconOrder = Array.from(
-      new Set(
-        customSocialOptionElements.map(
-          (option) => normalizeAdminSocialIconKey(option.value) ?? fallbackCustomSocialIconKey
-        )
-      )
-    ) as SiteSocialIconKey[];
-    const defaultCustomSocialIconKey: SiteSocialIconKey =
-      customSocialIconOrder[0] ?? fallbackCustomSocialIconKey;
-    const customSocialIconKeys = new Set<SiteSocialIconKey>(
-      customSocialOptionElements.map((option) => {
-        return normalizeAdminSocialIconKey(option.value) ?? defaultCustomSocialIconKey;
-      })
-    );
-    const customSocialIconLabels = new Map<SiteSocialIconKey, string>(
-      customSocialOptionElements.map((option) => {
-        const value = normalizeAdminSocialIconKey(option.value) ?? defaultCustomSocialIconKey;
-        const label =
-          option.getAttribute('data-social-default-label')?.trim() || option.textContent?.trim() || '链接';
-        return [value, label];
-      })
-    );
-    const getDefaultCustomSocialLabel = (iconKey: SiteSocialIconKey): string =>
-      customSocialIconLabels.get(iconKey)
-      || customSocialIconLabels.get(fallbackCustomSocialIconKey)
-      || customSocialIconLabels.get(defaultCustomSocialIconKey)
-      || '链接';
-    const isEditableCustomLabelIconKey = (iconKey: SiteSocialIconKey): boolean =>
-      iconKey === fallbackCustomSocialIconKey;
 
-    const getPresetRowId = (row: Element | null): SiteSocialPresetId => {
-      const value = row?.getAttribute('data-social-preset-id')?.trim() ?? 'github';
-      return isAdminSocialPresetId(value) ? value : 'github';
-    };
-
-    const normalizeMultiline = (value: string): string => value.replace(/\r\n/g, '\n');
-    const normalizeOptionalSingleLine = (value: string): string | null => {
-      const normalized = normalizeMultiline(value).trim();
-      return normalized || null;
-    };
-    const normalizeNavOrnament = (value: unknown): string | null => {
-      if (value === null) return null;
-      if (typeof value !== 'string') return ADMIN_NAV_ORNAMENT_DEFAULT;
-      const normalized = normalizeMultiline(value).trim();
-      return normalized || null;
-    };
-    const normalizeEmail = (value: string): string => value.replace(/^mailto:/i, '').trim();
-    const parseOrder = (value: string | number | null | undefined, fallback: number): number => {
-      const next = Number.parseInt(String(value ?? '').trim(), 10);
-      return Number.isFinite(next) ? next : fallback;
-    };
-    const parseInteger = (value: string | number | null | undefined): number | null => {
-      const next = Number.parseInt(String(value ?? '').trim(), 10);
-      return Number.isFinite(next) ? next : null;
-    };
-    const normalizeTrimmed = (value: unknown): string => String(value ?? '').trim();
-    const normalizeHeroImageSrc = (value: unknown): string | null => {
-      const rawValue = normalizeTrimmed(value);
-      if (!rawValue) return null;
-      return normalizeAdminHeroImageSrc(rawValue) ?? rawValue;
-    };
-    const normalizeHeroImageAlt = (value: unknown): string => {
-      const rawValue = normalizeTrimmed(value);
-      return rawValue || ADMIN_HERO_IMAGE_ALT_DEFAULT;
-    };
-    const normalizeCustomSocialLabel = (value: unknown, iconKey: SiteSocialIconKey): string => {
-      if (!isEditableCustomLabelIconKey(iconKey)) {
-        return getDefaultCustomSocialLabel(iconKey);
-      }
-      const normalized = normalizeTrimmed(value);
-      return normalized || getDefaultCustomSocialLabel(iconKey);
-    };
-    const getDisplayCustomSocialLabel = (value: unknown, iconKey: SiteSocialIconKey): string => {
-      const normalized = normalizeTrimmed(value);
-      if (!isEditableCustomLabelIconKey(iconKey)) {
-        return normalized || getDefaultCustomSocialLabel(iconKey);
-      }
-      const defaultLabel = getDefaultCustomSocialLabel(iconKey);
-      return normalized && normalized !== defaultLabel ? normalized : '';
-    };
-    const defaultHomeIntroLinks = [...ADMIN_HOME_INTRO_LINK_DEFAULT] as HomeIntroLinkKey[];
-    const defaultPrimaryHomeIntroLink: HomeIntroLinkKey = ADMIN_HOME_INTRO_LINK_DEFAULT[0];
-    const defaultSecondaryHomeIntroLink: HomeIntroLinkKey = ADMIN_HOME_INTRO_LINK_DEFAULT[1];
-    const getFallbackSecondaryIntroLink = (primary: HomeIntroLinkKey): HomeIntroLinkKey =>
-      defaultHomeIntroLinks.find((link) => link !== primary)
-      || ADMIN_HOME_INTRO_LINK_OPTIONS.find((option) => option.id !== primary)?.id
-      || defaultSecondaryHomeIntroLink
-      || primary;
-    const normalizeHomeIntroLinks = (value: unknown): HomeIntroLinkKey[] => {
-      if (!Array.isArray(value)) return [...defaultHomeIntroLinks];
-
-      const normalized: HomeIntroLinkKey[] = [];
-      const seen = new Set<HomeIntroLinkKey>();
-
-      value.forEach((item) => {
-        const rawValue = normalizeTrimmed(item);
-        if (!rawValue || !isAdminHomeIntroLinkKey(rawValue)) return;
-        const linkKey = rawValue as HomeIntroLinkKey;
-        if (seen.has(linkKey) || normalized.length >= ADMIN_HOME_INTRO_LINK_LIMIT) return;
-        normalized.push(linkKey);
-        seen.add(linkKey);
-      });
-
-      return normalized.length ? normalized : [...defaultHomeIntroLinks];
-    };
-    const getSelectedHomeIntroLink = (selectEl: HTMLSelectElement, fallback: HomeIntroLinkKey): HomeIntroLinkKey => {
-      const rawValue = selectEl.value.trim();
-      return isAdminHomeIntroLinkKey(rawValue) ? rawValue : fallback;
-    };
-    const HOME_INTRO_PREVIEW_EMPTY = '无首页补充导语';
-    const getHomeIntroLinkLabel = (linkKey: HomeIntroLinkKey): string =>
-      ADMIN_HOME_INTRO_LINK_OPTIONS.find((option) => option.id === linkKey)?.label || '链接';
-    const getHomeIntroPreviewText = (): string => {
-      if (!inputHomeShowIntroMore.checked) {
-        return HOME_INTRO_PREVIEW_EMPTY;
-      }
-      const introText = normalizeMultiline(inputHomeIntroMore.value).trim() || '……';
-      const [primary, secondary] = collectHomeIntroLinks();
-      const primaryLabel = getHomeIntroLinkLabel(primary || defaultPrimaryHomeIntroLink);
-      if (!secondary) {
-        return `${introText} ${primaryLabel}。`;
-      }
-      const secondaryLabel = getHomeIntroLinkLabel(secondary);
-      return `${introText} ${primaryLabel} 或 ${secondaryLabel}。`;
-    };
-    const refreshHomeIntroPreview = (): void => {
-      homeIntroMorePreviewEl.textContent = getHomeIntroPreviewText();
-    };
-    const syncHomeIntroLinkControls = (): void => {
-      const primary = getSelectedHomeIntroLink(inputHomeIntroMoreLinkPrimary, defaultPrimaryHomeIntroLink);
-      const hasSecondary = Boolean(inputHomeIntroMoreLinkSecondaryEnabled.checked);
-      inputHomeIntroMoreLinkSecondary.disabled = !hasSecondary;
-      homeIntroMoreLinkSecondaryGroupEl.setAttribute('aria-disabled', String(!hasSecondary));
-
-      if (hasSecondary) {
-        const secondary = getSelectedHomeIntroLink(
-          inputHomeIntroMoreLinkSecondary,
-          getFallbackSecondaryIntroLink(primary)
-        );
-
-        if (secondary === primary) {
-          inputHomeIntroMoreLinkSecondary.value = getFallbackSecondaryIntroLink(primary);
-        }
-      }
-
-      refreshHomeIntroPreview();
-    };
-    const collectHomeIntroLinks = (): HomeIntroLinkKey[] => {
-      const primary = getSelectedHomeIntroLink(inputHomeIntroMoreLinkPrimary, defaultPrimaryHomeIntroLink);
-      if (!inputHomeIntroMoreLinkSecondaryEnabled.checked) {
-        return [primary];
-      }
-
-      const secondary = getSelectedHomeIntroLink(
-        inputHomeIntroMoreLinkSecondary,
-        getFallbackSecondaryIntroLink(primary)
-      );
-
-      return secondary !== primary ? [primary, secondary] : [primary];
-    };
-    const syncHeroControls = (): void => {
-      const isHidden = !inputHomeShowHero.checked;
-      inputHeroImageSrc.disabled = isHidden;
-      inputHeroImageAlt.disabled = isHidden;
-    };
-    const getSelectedSidebarDividerVariant = (): SidebarDividerVariant => {
-      if (inputSidebarDividerSubtle.checked) return 'subtle';
-      if (inputSidebarDividerNone.checked) return 'none';
-      return ADMIN_SIDEBAR_DIVIDER_DEFAULT;
-    };
-    const applySidebarDividerVariant = (value: SidebarDividerVariant): void => {
-      inputSidebarDividerDefault.checked = value === 'default';
-      inputSidebarDividerSubtle.checked = value === 'subtle';
-      inputSidebarDividerNone.checked = value === 'none';
-    };
-
-    const getPresetOrderInputs = (): Record<SiteSocialPresetId, HTMLInputElement> => ({
-      github: inputSiteSocialGithubOrder,
-      x: inputSiteSocialXOrder,
-      email: inputSiteSocialEmailOrder
+    const {
+      defaultCustomSocialIconKey,
+      getPresetRows,
+      getCustomRows,
+      getPresetFieldTarget,
+      getCustomFieldTarget,
+      getCustomVisibilityTarget,
+      getCustomRowLabelInput,
+      getPresetRowHrefInput,
+      getPresetRowOrderInput,
+      getStoredGeneratedCustomId,
+      getStoredGeneratedCustomLabel,
+      getNextSocialOrder,
+      getPresetSocialOrder,
+      normalizeCustomSocialLabel,
+      syncPresetRow,
+      normalizeSocialOrders,
+      syncCustomRow,
+      updateCustomRowsUi,
+      createCustomRow,
+      finalizeCustomIdInput,
+      finalizeCustomLabelInput,
+      replaceCustomRows
+    } = createSocialLinks({
+      query,
+      queryAll,
+      socialCustomList,
+      socialCustomHead,
+      socialCustomCountEl,
+      socialCustomAddBtn,
+      socialCustomTemplate,
+      inputSiteSocialGithubOrder,
+      inputSiteSocialXOrder,
+      inputSiteSocialEmailOrder
     });
-    const getPresetSocialOrder = (): SocialPresetOrder => {
-      const inputs = getPresetOrderInputs();
-      return {
-        github: parseOrder(inputs.github.value, ADMIN_SOCIAL_PRESET_ORDER_DEFAULT.github),
-        x: parseOrder(inputs.x.value, ADMIN_SOCIAL_PRESET_ORDER_DEFAULT.x),
-        email: parseOrder(inputs.email.value, ADMIN_SOCIAL_PRESET_ORDER_DEFAULT.email)
-      };
+
+    const {
+      canonicalize,
+      collectSettings,
+      applySettings,
+      refreshHomeIntroPreview,
+      syncHomeIntroLinkControls,
+      syncHeroControls,
+      refreshFooterPreview,
+      syncFooterYearControls
+    } = createFormCodec({
+      footerStartYearMax,
+      query,
+      getNavRows,
+      getCustomRows,
+      getCustomRowLabelInput,
+      defaultCustomSocialIconKey,
+      normalizeCustomSocialLabel,
+      replaceCustomRows,
+      normalizeSocialOrders,
+      getPresetSocialOrder,
+      footerPreviewValueEl,
+      homeIntroMorePreviewEl,
+      homeIntroMoreLinkSecondaryGroupEl,
+      inputSiteTitle,
+      inputSiteDescription,
+      inputSiteDefaultLocale,
+      inputSiteFooterStartYear,
+      inputSiteFooterShowCurrentYear,
+      inputSiteFooterCopyright,
+      inputSiteSocialGithubOrder,
+      inputSiteSocialGithub,
+      inputSiteSocialXOrder,
+      inputSiteSocialX,
+      inputSiteSocialEmailOrder,
+      inputSiteSocialEmail,
+      inputShellBrandTitle,
+      inputShellQuote,
+      inputHomeShowIntroLead,
+      inputHomeShowIntroMore,
+      inputHomeIntroLead,
+      inputHomeIntroMore,
+      inputHomeIntroMoreLinkPrimary,
+      inputHomeIntroMoreLinkSecondaryEnabled,
+      inputHomeIntroMoreLinkSecondary,
+      inputPageEssayTitle,
+      inputPageEssaySubtitle,
+      inputPageArchiveTitle,
+      inputPageArchiveSubtitle,
+      inputPageBitsTitle,
+      inputPageBitsSubtitle,
+      inputPageMemoTitle,
+      inputPageMemoSubtitle,
+      inputPageAboutTitle,
+      inputPageAboutSubtitle,
+      inputPageBitsAuthorName,
+      inputPageBitsAuthorAvatar,
+      inputHomeShowHero,
+      inputHeroImageSrc,
+      inputHeroImageAlt,
+      inputCodeLineNumbers,
+      inputReadingEntry,
+      inputSidebarDividerDefault,
+      inputSidebarDividerSubtle,
+      inputSidebarDividerNone
+    });
+
+    const finalizeAppliedSettings = (): void => {
+      getPresetRows().forEach((row) => {
+        delete row.dataset.stashedHref;
+        delete row.dataset.stashedOrder;
+        syncPresetRow(row);
+      });
     };
+
+    const getNavFieldTarget = (
+      id: SidebarNavId,
+      field: 'label' | 'ornament' | 'order' | 'visible'
+    ): (() => HTMLElement | null) => () => {
+      const row = query<HTMLElement>(root, `[data-nav-id="${id}"]`);
+      return row ? query<HTMLElement>(row, `[data-nav-field="${field}"]`) : null;
+    };
+
+    const getFirstNavLabelTarget = (): HTMLElement | null => {
+      const firstNavId = ADMIN_NAV_IDS[0];
+      return firstNavId ? getNavFieldTarget(firstNavId, 'label')() : null;
+    };
+
+    const {
+      validateSettings,
+      clearInvalidFields,
+      markInvalidFields,
+      resolveIssueField
+    } = createValidation({
+      form,
+      queryAll,
+      footerStartYearMax,
+      socialCustomAddBtn,
+      inputSiteTitle,
+      inputSiteDescription,
+      inputSiteDefaultLocale,
+      inputSiteFooterStartYear,
+      inputSiteFooterShowCurrentYear,
+      inputSiteFooterCopyright,
+      inputSiteSocialGithub,
+      inputSiteSocialX,
+      inputSiteSocialEmail,
+      inputShellBrandTitle,
+      inputShellQuote,
+      inputHomeIntroLead,
+      inputHomeShowIntroLead,
+      inputHomeIntroMore,
+      inputHomeShowIntroMore,
+      inputHomeIntroMoreLinkPrimary,
+      inputHomeShowHero,
+      inputHeroImageSrc,
+      inputHeroImageAlt,
+      inputPageEssayTitle,
+      inputPageArchiveTitle,
+      inputPageBitsTitle,
+      inputPageMemoTitle,
+      inputPageAboutTitle,
+      inputPageEssaySubtitle,
+      inputPageArchiveSubtitle,
+      inputPageBitsSubtitle,
+      inputPageMemoSubtitle,
+      inputPageAboutSubtitle,
+      inputPageBitsAuthorName,
+      inputPageBitsAuthorAvatar,
+      inputSidebarDividerDefault,
+      getPresetFieldTarget,
+      getCustomFieldTarget,
+      getCustomVisibilityTarget,
+      getNavFieldTarget,
+      getFirstNavLabelTarget
+    });
 
     let baseline: EditableSettings | null = null;
+    let currentRevision: string | null = null;
     let isDirty = false;
     let isSaving = false;
+    let isConsoleLocked = false;
     let isAdminActionsNearViewport = false;
     const statusTargets = [statusEl, statusInlineEl];
 
-    const createIssue = (message: string, focusTarget?: () => HTMLElement | null): ValidationIssue =>
-      focusTarget ? { message, focusTarget } : { message };
-    const resolveIssueField = (issue: ValidationIssue): HTMLElement | null => {
-      const candidate = issue.focusTarget?.();
-      return candidate instanceof HTMLElement ? candidate : null;
-    };
-    const clearInvalidFields = (): void => {
-      queryAll<HTMLElement>(form, '[aria-invalid="true"]')
-        .forEach((element) => element.removeAttribute('aria-invalid'));
-    };
-    const markInvalidFields = (issues: readonly ValidationIssue[]): void => {
-      clearInvalidFields();
-      const seen = new Set<HTMLElement>();
-      issues.forEach((issue) => {
-        const field = resolveIssueField(issue);
-        if (!field || seen.has(field)) return;
-        field.setAttribute('aria-invalid', 'true');
-        seen.add(field);
-      });
-    };
     const scrollIntoViewWithOffset = (element: HTMLElement): void => {
       const top = element.getBoundingClientRect().top + window.scrollY - 24;
       window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
     };
+
     const revealErrorState = (issues: readonly ValidationIssue[] = []): void => {
       const firstField = issues
         .map((issue) => resolveIssueField(issue))
@@ -455,35 +394,10 @@ if (!root) {
         }
       });
     };
-    const getPresetFieldTarget = (id: SiteSocialPresetId, field: 'order' | 'href') => (): HTMLElement | null => {
-      const row = getPresetRows().find((currentRow) => getPresetRowId(currentRow) === id) ?? null;
-      return row ? query<HTMLElement>(row, `[data-social-preset-field="${field}"]`) : null;
-    };
-    const getCustomFieldTarget = (
-      index: number,
-      field: 'order' | 'iconKey' | 'id' | 'label' | 'href'
-    ) => (): HTMLElement | null => {
-      const row = getCustomRows()[index] ?? null;
-      return row ? query<HTMLElement>(row, `[data-social-custom-field="${field}"]`) : null;
-    };
-    const getCustomVisibilityTarget = (index: number): (() => HTMLElement | null) => () => {
-      const row = getCustomRows()[index] ?? null;
-      return row ? query<HTMLElement>(row, '[data-social-custom-action="toggle-visible"]') : null;
-    };
-    const getNavFieldTarget = (
-      id: SidebarNavId,
-      field: 'label' | 'ornament' | 'order' | 'visible'
-    ): (() => HTMLElement | null) => () => {
-      const row = query<HTMLElement>(root, `[data-nav-id="${id}"]`);
-      return row ? query<HTMLElement>(row, `[data-nav-field="${field}"]`) : null;
-    };
-    const getFirstNavLabelTarget = (): (() => HTMLElement | null) => () => {
-      const firstNavId = ADMIN_NAV_IDS[0];
-      return firstNavId ? getNavFieldTarget(firstNavId, 'label')() : null;
-    };
 
     const STATUS_WAITING_SAVE = '等待保存';
     const STATUS_CLEAN = '当前配置无未保存更改';
+    const STATUS_INVALID_SETTINGS = '配置损坏';
 
     const setStatus = (state: string, message: string, options: { announce?: boolean } = {}): void => {
       const currentState = statusEl.dataset.state ?? '';
@@ -503,6 +417,7 @@ if (!root) {
       statusLiveEl.dataset.state = state;
       statusLiveEl.textContent = message;
     };
+
     const syncDirtyStatus = (next: boolean): void => {
       const currentState = statusEl.dataset.state;
       const currentMessage = statusEl.textContent?.trim() || '';
@@ -519,14 +434,62 @@ if (!root) {
       }
     };
 
-    const setErrors = (errors: string[]): void => {
+    const clearErrorBanner = (): void => {
+      errorBanner.hidden = true;
+      errorTitleEl.textContent = '';
+      errorMessageEl.hidden = true;
+      errorMessageEl.textContent = '';
+      errorListEl.hidden = true;
+      errorListEl.replaceChildren();
+      errorRetryBtn.hidden = true;
+    };
+
+    const setErrorBanner = ({ title, message, items = [], retryable = false }: ErrorBannerState): void => {
+      errorBanner.hidden = false;
+      errorTitleEl.textContent = title;
+
+      if (message) {
+        errorMessageEl.hidden = false;
+        errorMessageEl.textContent = message;
+      } else {
+        errorMessageEl.hidden = true;
+        errorMessageEl.textContent = '';
+      }
+
+      errorListEl.replaceChildren();
+      if (items.length) {
+        const fragment = document.createDocumentFragment();
+        items.forEach((item) => {
+          if (typeof item === 'string') {
+            const entry = document.createElement('li');
+            entry.className = 'admin-banner__list-item';
+            entry.textContent = item;
+            fragment.appendChild(entry);
+            return;
+          }
+          fragment.appendChild(item);
+        });
+        errorListEl.appendChild(fragment);
+        errorListEl.hidden = false;
+      } else {
+        errorListEl.hidden = true;
+      }
+
+      errorRetryBtn.hidden = !retryable;
+    };
+
+    const setErrors = (errors: string[], options: ErrorBannerOptions = {}): void => {
       if (!errors.length) {
-        errorBanner.hidden = true;
-        errorBanner.textContent = '';
+        clearErrorBanner();
         return;
       }
-      errorBanner.hidden = false;
-      errorBanner.textContent = errors.join('；');
+
+      setErrorBanner({
+        title: options.title ?? '请先处理以下问题',
+        ...(options.message ? { message: options.message } : {}),
+        items: errors,
+        retryable: options.retryable ?? false
+      });
     };
 
     const setDirty = (next: boolean): void => {
@@ -537,1055 +500,37 @@ if (!root) {
       syncDirtyStatus(next);
     };
 
+    const syncInteractiveAvailability = (): void => {
+      queryAll<AdminControl>(root, 'input, textarea, select, button').forEach((element) => {
+        if (element === errorRetryBtn) {
+          element.disabled = false;
+          return;
+        }
+
+        if (element === saveBtn) {
+          element.disabled = isConsoleLocked || isSaving;
+          return;
+        }
+
+        element.disabled = isConsoleLocked;
+      });
+    };
+
+    const setConsoleLocked = (next: boolean): void => {
+      isConsoleLocked = next;
+      root.dataset.consoleLocked = String(next);
+      syncInteractiveAvailability();
+    };
+
     const setSaving = (next: boolean): void => {
       isSaving = next;
-      saveBtn.disabled = next;
       saveBtn.textContent = next ? '保存中...' : '保存';
+      syncInteractiveAvailability();
     };
+
     const setValidationIssues = (issues: readonly ValidationIssue[]): void => {
       markInvalidFields(issues);
       setErrors(issues.map((issue) => issue.message));
-    };
-
-    const getFooterPreviewText = (): string => {
-      const startYear = parseInteger(inputSiteFooterStartYear.value);
-      const showCurrentYear = Boolean(inputSiteFooterShowCurrentYear.checked);
-      const yearRange = showCurrentYear && startYear && startYear < footerStartYearMax
-        ? `${startYear}-${footerStartYearMax}`
-        : String(startYear || footerStartYearMax);
-      const copyright = inputSiteFooterCopyright.value.trim() || 'Whono · Theme Demo · by cxro';
-      return `页脚预览：© ${yearRange} ${copyright}`;
-    };
-
-    const refreshFooterPreview = (): void => {
-      footerPreviewValueEl.textContent = getFooterPreviewText().replace(/^页脚预览：/, '').trim();
-    };
-    const syncFooterYearControls = (): void => {
-      const footerYearRangeEl = inputSiteFooterShowCurrentYear.closest<HTMLElement>('.admin-year-range');
-      if (!footerYearRangeEl) return;
-      footerYearRangeEl.dataset.currentYearEnabled = String(Boolean(inputSiteFooterShowCurrentYear.checked));
-    };
-
-    const getCustomRowIconKey = (row: Element | null): SiteSocialIconKey => {
-      const select = row ? query<HTMLSelectElement>(row, '[data-social-custom-field="iconKey"]') : null;
-      const value = normalizeAdminSocialIconKey(select?.value);
-      return value && customSocialIconKeys.has(value) ? value : defaultCustomSocialIconKey;
-    };
-    const getNextDefaultCustomSocialIconKey = (): SiteSocialIconKey => {
-      const usedIconKeys = new Set(getCustomRows().map((row) => getCustomRowIconKey(row)));
-      return customSocialIconOrder.find((iconKey) => !usedIconKeys.has(iconKey)) || defaultCustomSocialIconKey;
-    };
-    const getCustomRowLabelInput = (row: Element | null): HTMLInputElement | null =>
-      row ? query<HTMLInputElement>(row, '[data-social-custom-field="label"]') : null;
-    const getCustomRowLabelField = (row: Element | null): HTMLElement | null =>
-      row ? query<HTMLElement>(row, '.admin-social-link-label') : null;
-
-    const getPresetRowHrefInput = (row: Element | null): HTMLInputElement | null =>
-      row ? query<HTMLInputElement>(row, '[data-social-preset-field="href"]') : null;
-    const getPresetRowOrderInput = (row: Element | null): HTMLInputElement | null =>
-      row ? query<HTMLInputElement>(row, '[data-social-preset-field="order"]') : null;
-    const isPresetRowVisible = (row: Element | null): boolean => {
-      const hrefInput = getPresetRowHrefInput(row);
-      return hrefInput instanceof HTMLInputElement && hrefInput.value.trim().length > 0;
-    };
-
-    const syncPresetRow = (row: Element | null): void => {
-      if (!row) return;
-      const toggleBtn = query<HTMLButtonElement>(row, '[data-social-preset-action="toggle-visible"]');
-      if (!(toggleBtn instanceof HTMLButtonElement)) return;
-
-      const presetId = getPresetRowId(row);
-      const label = presetId === 'x' ? 'X' : presetId === 'email' ? 'Email' : 'GitHub';
-      const visible = isPresetRowVisible(row);
-      toggleBtn.dataset.state = visible ? 'visible' : 'hidden';
-      toggleBtn.setAttribute('aria-pressed', visible ? 'true' : 'false');
-      toggleBtn.setAttribute('aria-label', visible ? `隐藏 ${label}` : `恢复 ${label}`);
-      toggleBtn.setAttribute('title', visible ? `隐藏 ${label}` : `恢复 ${label}`);
-    };
-
-    const normalizeSocialOrders = (): void => {
-      type SocialOrderItem = {
-        row: HTMLElement;
-        type: 'preset' | 'custom';
-        visible: boolean;
-        order: number;
-        tie: number;
-      };
-
-      const presetRows = getPresetRows();
-      const customRows = getCustomRows();
-      const items: SocialOrderItem[] = [
-        ...presetRows.map((row, index) => ({
-          row,
-          type: 'preset' as const,
-          visible: isPresetRowVisible(row),
-          order: parseOrder(
-            getPresetRowOrderInput(row)?.value || '',
-            ADMIN_SOCIAL_PRESET_ORDER_DEFAULT[getPresetRowId(row)]
-          ),
-          tie: index
-        })),
-        ...customRows.map((row, index) => ({
-          row,
-          type: 'custom' as const,
-          visible: Boolean(query<HTMLInputElement>(row, '[data-social-custom-field="visible"]')?.checked),
-          order: parseOrder(query<HTMLInputElement>(row, '[data-social-custom-field="order"]')?.value || '', index + 1),
-          tie: presetRows.length + index
-        }))
-      ];
-
-      const orderedItems = [
-        ...items.filter((item) => item.visible).sort((a, b) => a.order - b.order || a.tie - b.tie),
-        ...items.filter((item) => !item.visible).sort((a, b) => a.order - b.order || a.tie - b.tie)
-      ];
-
-      orderedItems.forEach((item, index) => {
-        const nextValue = String(index + 1);
-        if (item.type === 'preset') {
-          const orderInput = getPresetRowOrderInput(item.row);
-          if (orderInput instanceof HTMLInputElement) orderInput.value = nextValue;
-        } else {
-          const orderInput = query<HTMLInputElement>(item.row, '[data-social-custom-field="order"]');
-          if (orderInput instanceof HTMLInputElement) orderInput.value = nextValue;
-        }
-      });
-    };
-
-    const slugifyIdPart = (value: unknown): string => {
-      const slug = String(value ?? '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      return slug || 'link';
-    };
-
-    const getCustomIdValues = (exceptRow?: Element | null): Set<string> =>
-      new Set(
-        getCustomRows()
-          .filter((row) => row !== exceptRow)
-          .map((row) => query<HTMLInputElement>(row, '[data-social-custom-field="id"]')?.value.trim() || '')
-          .filter(Boolean)
-      );
-
-    const generateCustomId = (
-      row: Element | null,
-      iconKey: SiteSocialIconKey = getCustomRowIconKey(row)
-    ): string => {
-      const existingIds = getCustomIdValues(row);
-      const base = `custom-${slugifyIdPart(iconKey)}`;
-      let candidate = base;
-      let suffix = 2;
-
-      while (existingIds.has(candidate)) {
-        candidate = `${base}-${suffix}`;
-        suffix += 1;
-      }
-
-      return candidate;
-    };
-
-    const getStoredGeneratedCustomId = (row: HTMLElement | null): string => row?.dataset.generatedId?.trim() || '';
-    const getStoredGeneratedCustomLabel = (row: HTMLElement | null): string =>
-      row?.dataset.generatedLabel?.trim() || '';
-
-    const applyGeneratedCustomId = (row: HTMLElement | null, nextId: string): void => {
-      const idInput = row ? query<HTMLInputElement>(row, '[data-social-custom-field="id"]') : null;
-      if (!(idInput instanceof HTMLInputElement) || !row) return;
-
-      idInput.value = nextId;
-      row.dataset.generatedId = nextId;
-      row.dataset.idManual = 'false';
-    };
-    const applyGeneratedCustomLabel = (row: HTMLElement | null, nextLabel: string): void => {
-      const labelInput = getCustomRowLabelInput(row);
-      if (!(labelInput instanceof HTMLInputElement) || !row) return;
-
-      labelInput.value = getDisplayCustomSocialLabel(nextLabel, getCustomRowIconKey(row));
-      row.dataset.generatedLabel = nextLabel;
-      row.dataset.labelManual = 'false';
-    };
-
-    const shouldAutoSyncCustomId = (row: HTMLElement | null): boolean => {
-      const idInput = row ? query<HTMLInputElement>(row, '[data-social-custom-field="id"]') : null;
-      if (!(idInput instanceof HTMLInputElement) || !row) return false;
-
-      const trimmed = idInput.value.trim();
-      const generatedId = getStoredGeneratedCustomId(row);
-      return row.dataset.idManual !== 'true' || !trimmed || Boolean(generatedId && trimmed === generatedId);
-    };
-    const shouldAutoSyncCustomLabel = (row: HTMLElement | null): boolean => {
-      const labelInput = getCustomRowLabelInput(row);
-      if (!(labelInput instanceof HTMLInputElement) || !row) return false;
-
-      const trimmed = labelInput.value.trim();
-      const generatedLabel = getStoredGeneratedCustomLabel(row);
-      return row.dataset.labelManual !== 'true' || !trimmed || Boolean(generatedLabel && trimmed === generatedLabel);
-    };
-
-    const getNextSocialOrder = (): number => {
-      const presetOrders = Object.values(getPresetSocialOrder());
-      const customOrders = getCustomRows()
-        .map((row) => parseInteger(query<HTMLInputElement>(row, '[data-social-custom-field="order"]')?.value))
-        .filter((value): value is number => value != null);
-      const orders = [...presetOrders, ...customOrders];
-      return orders.length ? Math.max(...orders) + 1 : 1;
-    };
-
-    const syncCustomIconPreview = (row: HTMLElement): void => {
-      const iconKey = getCustomRowIconKey(row);
-      queryAll<HTMLElement>(row, '[data-social-custom-icon-option]').forEach((node) => {
-        const active = node.getAttribute('data-social-custom-icon-option') === iconKey;
-        node.hidden = !active;
-      });
-    };
-
-    const syncCustomVisibilityButton = (row: HTMLElement): void => {
-      const visibleInput = query<HTMLInputElement>(row, '[data-social-custom-field="visible"]');
-      const toggleBtn = query<HTMLButtonElement>(row, '[data-social-custom-action="toggle-visible"]');
-      const toggleLabel = query<HTMLElement>(row, '[data-social-custom-visible-label]');
-      if (
-        !(visibleInput instanceof HTMLInputElement) ||
-        !(toggleBtn instanceof HTMLButtonElement) ||
-        !(toggleLabel instanceof HTMLElement)
-      ) {
-        return;
-      }
-
-      const visible = Boolean(visibleInput.checked);
-      toggleBtn.dataset.state = visible ? 'visible' : 'hidden';
-      toggleBtn.setAttribute('aria-pressed', visible ? 'true' : 'false');
-      toggleBtn.setAttribute('aria-label', visible ? '隐藏链接' : '显示链接');
-      toggleBtn.setAttribute('title', visible ? '隐藏链接' : '显示链接');
-      toggleLabel.textContent = visible ? '隐藏链接' : '显示链接';
-    };
-
-    const finalizeCustomIdInput = (
-      row: HTMLElement,
-      options: { regenerateIfEmpty?: boolean } = {}
-    ): void => {
-      const { regenerateIfEmpty = true } = options;
-      const idInput = query<HTMLInputElement>(row, '[data-social-custom-field="id"]');
-      if (!(idInput instanceof HTMLInputElement)) return;
-
-      const trimmed = idInput.value.trim();
-      const generatedId = getStoredGeneratedCustomId(row);
-      if (!trimmed && regenerateIfEmpty) {
-        applyGeneratedCustomId(row, generateCustomId(row));
-      } else {
-        idInput.value = trimmed;
-        row.dataset.idManual = trimmed && trimmed !== generatedId ? 'true' : 'false';
-      }
-    };
-
-    const finalizeCustomLabelInput = (
-      row: HTMLElement,
-      options: { regenerateIfEmpty?: boolean } = {}
-    ): void => {
-      const { regenerateIfEmpty = true } = options;
-      const labelInput = getCustomRowLabelInput(row);
-      if (!(labelInput instanceof HTMLInputElement)) return;
-
-      const trimmed = labelInput.value.trim();
-      const nextGeneratedLabel = getDefaultCustomSocialLabel(getCustomRowIconKey(row));
-      const generatedLabel = getStoredGeneratedCustomLabel(row) || nextGeneratedLabel;
-      row.dataset.generatedLabel = nextGeneratedLabel;
-      if (!trimmed && regenerateIfEmpty) {
-        applyGeneratedCustomLabel(row, nextGeneratedLabel);
-      } else {
-        labelInput.value = getDisplayCustomSocialLabel(trimmed, getCustomRowIconKey(row));
-        row.dataset.labelManual = trimmed && trimmed !== generatedLabel ? 'true' : 'false';
-      }
-    };
-
-    const syncCustomLabelField = (
-      row: HTMLElement,
-      options: { syncValue?: boolean } = {}
-    ): void => {
-      const { syncValue = false } = options;
-      const labelField = getCustomRowLabelField(row);
-      const iconKey = getCustomRowIconKey(row);
-      const editable = isEditableCustomLabelIconKey(iconKey);
-      row.dataset.customLabelVisible = String(editable);
-      if (labelField instanceof HTMLElement) {
-        labelField.hidden = !editable;
-      }
-
-      if (!editable) {
-        applyGeneratedCustomLabel(row, getDefaultCustomSocialLabel(iconKey));
-        return;
-      }
-
-      if (syncValue) {
-        const nextGeneratedLabel = getDefaultCustomSocialLabel(iconKey);
-        if (shouldAutoSyncCustomLabel(row)) {
-          applyGeneratedCustomLabel(row, nextGeneratedLabel);
-        } else {
-          row.dataset.generatedLabel = nextGeneratedLabel;
-        }
-      }
-    };
-
-    const syncCustomRow = (row: HTMLElement, options: { syncId?: boolean; syncLabel?: boolean } = {}): void => {
-      const { syncId = false, syncLabel = false } = options;
-      const idInput = query<HTMLInputElement>(row, '[data-social-custom-field="id"]');
-      if (!(idInput instanceof HTMLInputElement)) return;
-      const iconKey = getCustomRowIconKey(row);
-
-      if (syncId && shouldAutoSyncCustomId(row)) {
-        applyGeneratedCustomId(row, generateCustomId(row, iconKey));
-      }
-
-      syncCustomLabelField(row, { syncValue: syncLabel });
-
-      syncCustomIconPreview(row);
-      syncCustomVisibilityButton(row);
-    };
-
-    const updateCustomRowsUi = (): void => {
-      const rows = getCustomRows();
-      socialCustomHead.hidden = false;
-      socialCustomCountEl.textContent = `(新增 ${rows.length} / ${ADMIN_SOCIAL_CUSTOM_LIMIT})`;
-      socialCustomAddBtn.disabled = rows.length >= ADMIN_SOCIAL_CUSTOM_LIMIT;
-    };
-
-    const createCustomRow = (
-      item: Partial<EditableCustomSocialItem> | null | undefined,
-      index: number,
-      options: { manualId?: boolean } = {}
-    ): HTMLElement | null => {
-      const { manualId = false } = options;
-      const fragment = socialCustomTemplate.content.cloneNode(true) as DocumentFragment;
-      const row = query<HTMLElement>(fragment, '[data-social-custom-row]');
-      if (!(row instanceof HTMLElement)) return null;
-
-      const idInput = query<HTMLInputElement>(row, '[data-social-custom-field="id"]');
-      const labelInput = getCustomRowLabelInput(row);
-      const hrefInput = query<HTMLInputElement>(row, '[data-social-custom-field="href"]');
-      const iconInput = query<HTMLSelectElement>(row, '[data-social-custom-field="iconKey"]');
-      const orderInput = query<HTMLInputElement>(row, '[data-social-custom-field="order"]');
-      const visibleInput = query<HTMLInputElement>(row, '[data-social-custom-field="visible"]');
-
-      if (
-        !(idInput instanceof HTMLInputElement) ||
-        !(labelInput instanceof HTMLInputElement) ||
-        !(hrefInput instanceof HTMLInputElement) ||
-        !(iconInput instanceof HTMLSelectElement) ||
-        !(orderInput instanceof HTMLInputElement) ||
-        !(visibleInput instanceof HTMLInputElement)
-      ) {
-        return null;
-      }
-
-      row.dataset.idManual = manualId ? 'true' : 'false';
-      const initialIconKey =
-        typeof item?.iconKey === 'string'
-          ? normalizeAdminSocialIconKey(item.iconKey) ?? fallbackCustomSocialIconKey
-          : getNextDefaultCustomSocialIconKey();
-      const initialLabel = normalizeCustomSocialLabel(item?.label, initialIconKey);
-      const initialDisplayLabel = getDisplayCustomSocialLabel(initialLabel, initialIconKey);
-      idInput.value = item?.id ? String(item.id).trim() : '';
-      labelInput.value = initialDisplayLabel;
-      hrefInput.value = item?.href ? String(item.href).trim() : '';
-      iconInput.value = initialIconKey;
-      orderInput.value = String(parseOrder(item?.order, index + 1));
-      visibleInput.checked = item?.visible !== false;
-      row.dataset.generatedLabel = getDefaultCustomSocialLabel(initialIconKey);
-      row.dataset.labelManual =
-        isEditableCustomLabelIconKey(initialIconKey)
-        && initialDisplayLabel
-        && initialLabel !== row.dataset.generatedLabel
-          ? 'true'
-          : 'false';
-      syncCustomRow(row, {
-        syncId: !item?.id,
-        syncLabel: isEditableCustomLabelIconKey(initialIconKey) && !item?.label
-      });
-      row.dataset.generatedId = idInput.value.trim();
-
-      return row;
-    };
-
-    const replaceCustomRows = (items: EditableCustomSocialItem[]): void => {
-      getCustomRows().forEach((row) => row.remove());
-      items.forEach((item, index) => {
-        const row = createCustomRow(item, index, { manualId: false });
-        if (row) socialCustomList.appendChild(row);
-      });
-      updateCustomRowsUi();
-    };
-
-    const canonicalize = (settings: unknown): EditableSettings => {
-      type SortableCustomItem = EditableCustomSocialItem & { __index: number };
-
-      const next = isRecord(settings) ? settings : {};
-      const site = isRecord(next.site) ? next.site : {};
-      const shell = isRecord(next.shell) ? next.shell : {};
-      const home = isRecord(next.home) ? next.home : {};
-      const page = isRecord(next.page) ? next.page : {};
-      const ui = isRecord(next.ui) ? next.ui : {};
-      const siteFooter = isRecord(site.footer) ? site.footer : {};
-      const socialLinks = isRecord(site.socialLinks) ? site.socialLinks : {};
-      const customItems = Array.isArray(socialLinks.custom) ? socialLinks.custom : [];
-      const bitsPage = isRecord(page.bits) ? page.bits : {};
-      const bitsDefaultAuthor = isRecord(bitsPage.defaultAuthor) ? bitsPage.defaultAuthor : {};
-
-      const normalizedCustom: EditableCustomSocialItem[] = customItems
-        .map((item, index) => {
-          const record = isRecord(item) ? item : {};
-          const iconKey = normalizeAdminSocialIconKey(record.iconKey) ?? defaultCustomSocialIconKey;
-          const sortableItem: SortableCustomItem = {
-            id: normalizeTrimmed(record.id),
-            label: normalizeCustomSocialLabel(record.label, iconKey),
-            href: normalizeTrimmed(record.href),
-            iconKey,
-            visible: Boolean(record.visible),
-            order: parseOrder(record.order as string | number | null | undefined, index + 1),
-            __index: index
-          };
-          return sortableItem;
-        })
-        .sort((a, b) => {
-          if (a.order !== b.order) return a.order - b.order;
-          const idCompare = a.id.localeCompare(b.id);
-          if (idCompare !== 0) return idCompare;
-          return a.__index - b.__index;
-        })
-        .map(({ __index, ...item }) => item);
-
-      const normalizedNav = (Array.isArray(shell.nav) ? shell.nav : [])
-        .map((item) => {
-          const record = isRecord(item) ? item : null;
-          if (!record) return null;
-          const id = normalizeTrimmed(record.id);
-          if (!isAdminNavId(id)) return null;
-          return {
-            id,
-            label: normalizeTrimmed(record.label),
-            ornament: normalizeNavOrnament(record.ornament),
-            order: parseOrder(record.order as string | number | null | undefined, ADMIN_NAV_IDS.indexOf(id) + 1),
-            visible: Boolean(record.visible)
-          };
-        })
-        .filter((item): item is EditableNavItem => item !== null)
-        .sort((a, b) => {
-          if (a.order !== b.order) return a.order - b.order;
-          return ADMIN_NAV_IDS.indexOf(a.id) - ADMIN_NAV_IDS.indexOf(b.id);
-        });
-
-      const rawHeroPresetId = normalizeTrimmed(home.heroPresetId);
-      const heroImageSrc = normalizeHeroImageSrc(home.heroImageSrc);
-      const heroImageAlt = normalizeHeroImageAlt(home.heroImageAlt);
-      const rawPresetOrder = isRecord(socialLinks.presetOrder) ? socialLinks.presetOrder : {};
-      const showIntroLead =
-        typeof home.showIntroLead === 'boolean' ? home.showIntroLead : true;
-      const showIntroMore =
-        typeof home.showIntroMore === 'boolean' ? home.showIntroMore : true;
-      const introMoreLinks = normalizeHomeIntroLinks(home.introMoreLinks);
-      const rawUiLayout: LooseRecord = isRecord(ui.layout) ? ui.layout : {};
-      const rawSidebarDivider = normalizeTrimmed(rawUiLayout.sidebarDivider);
-
-      return {
-        site: {
-          title: normalizeTrimmed(site.title),
-          description: normalizeMultiline(String(site.description ?? '')).trim(),
-          defaultLocale: normalizeTrimmed(site.defaultLocale),
-          footer: {
-            startYear: parseInteger(siteFooter.startYear as string | number | null | undefined) ?? footerStartYearMax,
-            showCurrentYear: Boolean(siteFooter.showCurrentYear),
-            copyright: normalizeTrimmed(siteFooter.copyright)
-          },
-          socialLinks: {
-            github: normalizeTrimmed(socialLinks.github) || null,
-            x: normalizeTrimmed(socialLinks.x) || null,
-            email: normalizeEmail(normalizeTrimmed(socialLinks.email)) || null,
-            presetOrder: {
-              github: parseOrder(rawPresetOrder.github as string | number | null | undefined, ADMIN_SOCIAL_PRESET_ORDER_DEFAULT.github),
-              x: parseOrder(rawPresetOrder.x as string | number | null | undefined, ADMIN_SOCIAL_PRESET_ORDER_DEFAULT.x),
-              email: parseOrder(rawPresetOrder.email as string | number | null | undefined, ADMIN_SOCIAL_PRESET_ORDER_DEFAULT.email)
-            },
-            custom: normalizedCustom
-          }
-        },
-        shell: {
-          brandTitle: normalizeTrimmed(shell.brandTitle),
-          quote: normalizeMultiline(String(shell.quote ?? '')).trim(),
-          nav: normalizedNav
-        },
-        home: {
-          introLead: normalizeMultiline(String(home.introLead ?? '')).trim(),
-          introMore: normalizeMultiline(String(home.introMore ?? '')).trim(),
-          introMoreLinks,
-          showIntroLead,
-          showIntroMore,
-          heroPresetId: isAdminHeroPresetId(rawHeroPresetId) ? rawHeroPresetId : 'default',
-          heroImageSrc,
-          heroImageAlt
-        },
-        page: {
-          essay: {
-            title: normalizeOptionalSingleLine(String(isRecord(page.essay) ? page.essay.title ?? '' : '')),
-            subtitle: normalizeOptionalSingleLine(String(isRecord(page.essay) ? page.essay.subtitle ?? '' : ''))
-          },
-          archive: {
-            title: normalizeOptionalSingleLine(String(isRecord(page.archive) ? page.archive.title ?? '' : '')),
-            subtitle: normalizeOptionalSingleLine(String(isRecord(page.archive) ? page.archive.subtitle ?? '' : ''))
-          },
-          bits: {
-            title: normalizeOptionalSingleLine(String(bitsPage.title ?? '')),
-            subtitle: normalizeOptionalSingleLine(String(bitsPage.subtitle ?? '')),
-            defaultAuthor: {
-              name: normalizeTrimmed(bitsDefaultAuthor.name),
-              avatar: normalizeTrimmed(bitsDefaultAuthor.avatar)
-            }
-          },
-          memo: {
-            title: normalizeOptionalSingleLine(String(isRecord(page.memo) ? page.memo.title ?? '' : '')),
-            subtitle: normalizeOptionalSingleLine(String(isRecord(page.memo) ? page.memo.subtitle ?? '' : ''))
-          },
-          about: {
-            title: normalizeOptionalSingleLine(String(isRecord(page.about) ? page.about.title ?? '' : '')),
-            subtitle: normalizeOptionalSingleLine(String(isRecord(page.about) ? page.about.subtitle ?? '' : ''))
-          }
-        },
-        ui: {
-          codeBlock: {
-            showLineNumbers: Boolean(isRecord(ui.codeBlock) ? ui.codeBlock.showLineNumbers : false)
-          },
-          readingMode: {
-            showEntry: Boolean(isRecord(ui.readingMode) ? ui.readingMode.showEntry : false)
-          },
-          layout: {
-            sidebarDivider: isAdminSidebarDividerVariant(rawSidebarDivider)
-              ? rawSidebarDivider
-              : ADMIN_SIDEBAR_DIVIDER_DEFAULT
-          }
-        }
-      };
-    };
-
-    const collectSettings = (): EditableSettings => {
-      const nav = getNavRows().map((row, index): EditableNavItem => {
-        const idRaw = row.getAttribute('data-nav-id')?.trim() ?? '';
-        const id = isAdminNavId(idRaw) ? idRaw : ADMIN_NAV_IDS[index] ?? 'essay';
-        const labelInput = query<HTMLInputElement>(row, '[data-nav-field="label"]');
-        const ornamentInput = query<HTMLInputElement>(row, '[data-nav-field="ornament"]');
-        const orderInput = query<HTMLInputElement>(row, '[data-nav-field="order"]');
-        const visibleInput = query<HTMLInputElement>(row, '[data-nav-field="visible"]');
-        const fallbackOrder = index + 1;
-        return {
-          id,
-          label: labelInput?.value.trim() || '',
-          ornament: ornamentInput ? normalizeOptionalSingleLine(ornamentInput.value) : ADMIN_NAV_ORNAMENT_DEFAULT,
-          order: parseOrder(orderInput?.value || '', fallbackOrder),
-          visible: Boolean(visibleInput?.checked)
-        };
-      });
-
-      const custom = getCustomRows().map((row, index): EditableCustomSocialItem => {
-        const idInput = query<HTMLInputElement>(row, '[data-social-custom-field="id"]');
-        const labelInput = getCustomRowLabelInput(row);
-        const hrefInput = query<HTMLInputElement>(row, '[data-social-custom-field="href"]');
-        const iconInput = query<HTMLSelectElement>(row, '[data-social-custom-field="iconKey"]');
-        const orderInput = query<HTMLInputElement>(row, '[data-social-custom-field="order"]');
-        const visibleInput = query<HTMLInputElement>(row, '[data-social-custom-field="visible"]');
-        const iconKey = normalizeAdminSocialIconKey(iconInput?.value) ?? defaultCustomSocialIconKey;
-        return {
-          id: idInput?.value.trim() || '',
-          label: normalizeCustomSocialLabel(labelInput?.value, iconKey),
-          href: hrefInput?.value.trim() || '',
-          iconKey,
-          order: parseOrder(orderInput?.value || '', index + 1),
-          visible: Boolean(visibleInput?.checked)
-        };
-      });
-
-      return {
-        site: {
-          title: inputSiteTitle.value.trim(),
-          description: normalizeMultiline(inputSiteDescription.value).trim(),
-          defaultLocale: inputSiteDefaultLocale.value.trim(),
-          footer: {
-            startYear: parseInteger(inputSiteFooterStartYear.value) ?? footerStartYearMax,
-            showCurrentYear: Boolean(inputSiteFooterShowCurrentYear.checked),
-            copyright: inputSiteFooterCopyright.value.trim()
-          },
-          socialLinks: {
-            github: inputSiteSocialGithub.value.trim() || null,
-            x: inputSiteSocialX.value.trim() || null,
-            email: normalizeEmail(inputSiteSocialEmail.value.trim()) || null,
-            presetOrder: getPresetSocialOrder(),
-            custom
-          }
-        },
-        shell: {
-          brandTitle: inputShellBrandTitle.value.trim(),
-          quote: normalizeMultiline(inputShellQuote.value).trim(),
-          nav
-        },
-        home: {
-          introLead: normalizeMultiline(inputHomeIntroLead.value).trim(),
-          introMore: normalizeMultiline(inputHomeIntroMore.value).trim(),
-          introMoreLinks: collectHomeIntroLinks(),
-          showIntroLead: Boolean(inputHomeShowIntroLead.checked),
-          showIntroMore: Boolean(inputHomeShowIntroMore.checked),
-          heroPresetId: inputHomeShowHero.checked ? 'default' : 'none',
-          heroImageSrc: normalizeHeroImageSrc(inputHeroImageSrc.value),
-          heroImageAlt: normalizeHeroImageAlt(inputHeroImageAlt.value)
-        },
-        page: {
-          essay: {
-            title: normalizeOptionalSingleLine(inputPageEssayTitle.value),
-            subtitle: normalizeOptionalSingleLine(inputPageEssaySubtitle.value)
-          },
-          archive: {
-            title: normalizeOptionalSingleLine(inputPageArchiveTitle.value),
-            subtitle: normalizeOptionalSingleLine(inputPageArchiveSubtitle.value)
-          },
-          bits: {
-            title: normalizeOptionalSingleLine(inputPageBitsTitle.value),
-            subtitle: normalizeOptionalSingleLine(inputPageBitsSubtitle.value),
-            defaultAuthor: {
-              name: inputPageBitsAuthorName.value.trim(),
-              avatar: inputPageBitsAuthorAvatar.value.trim()
-            }
-          },
-          memo: {
-            title: normalizeOptionalSingleLine(inputPageMemoTitle.value),
-            subtitle: normalizeOptionalSingleLine(inputPageMemoSubtitle.value)
-          },
-          about: {
-            title: normalizeOptionalSingleLine(inputPageAboutTitle.value),
-            subtitle: normalizeOptionalSingleLine(inputPageAboutSubtitle.value)
-          }
-        },
-        ui: {
-          codeBlock: {
-            showLineNumbers: Boolean(inputCodeLineNumbers.checked)
-          },
-          readingMode: {
-            showEntry: Boolean(inputReadingEntry.checked)
-          },
-          layout: {
-            sidebarDivider: getSelectedSidebarDividerVariant()
-          }
-        }
-      };
-    };
-
-    const applySettings = (settings: EditableSettings): void => {
-      inputSiteTitle.value = settings.site.title || '';
-      inputSiteDescription.value = settings.site.description || '';
-      inputSiteDefaultLocale.value = settings.site.defaultLocale || '';
-      inputSiteFooterStartYear.value = String(settings.site.footer?.startYear ?? '');
-      inputSiteFooterShowCurrentYear.checked = Boolean(settings.site.footer?.showCurrentYear);
-      inputSiteFooterCopyright.value = settings.site.footer?.copyright || '';
-      inputSiteSocialGithubOrder.value = String(
-        settings.site.socialLinks?.presetOrder?.github ?? ADMIN_SOCIAL_PRESET_ORDER_DEFAULT.github
-      );
-      inputSiteSocialGithub.value = settings.site.socialLinks?.github || '';
-      inputSiteSocialXOrder.value = String(
-        settings.site.socialLinks?.presetOrder?.x ?? ADMIN_SOCIAL_PRESET_ORDER_DEFAULT.x
-      );
-      inputSiteSocialX.value = settings.site.socialLinks?.x || '';
-      inputSiteSocialEmailOrder.value = String(
-        settings.site.socialLinks?.presetOrder?.email ?? ADMIN_SOCIAL_PRESET_ORDER_DEFAULT.email
-      );
-      inputSiteSocialEmail.value = settings.site.socialLinks?.email || '';
-      getPresetRows().forEach((row) => {
-        delete row.dataset.stashedHref;
-        delete row.dataset.stashedOrder;
-        syncPresetRow(row);
-      });
-      replaceCustomRows(settings.site.socialLinks?.custom || []);
-      normalizeSocialOrders();
-      inputShellBrandTitle.value = settings.shell.brandTitle || '';
-      inputShellQuote.value = settings.shell.quote || '';
-      inputHomeShowIntroLead.checked = settings.home.showIntroLead !== false;
-      inputHomeShowIntroMore.checked = settings.home.showIntroMore !== false;
-      inputHomeIntroLead.value = settings.home.introLead || '';
-      inputHomeIntroMore.value = settings.home.introMore || '';
-      const introMoreLinks = normalizeHomeIntroLinks(settings.home.introMoreLinks);
-      const primaryIntroLink = introMoreLinks[0] || defaultPrimaryHomeIntroLink;
-      inputHomeIntroMoreLinkPrimary.value = primaryIntroLink;
-      inputHomeIntroMoreLinkSecondaryEnabled.checked = introMoreLinks.length > 1;
-      inputHomeIntroMoreLinkSecondary.value =
-        introMoreLinks[1] || getFallbackSecondaryIntroLink(primaryIntroLink);
-      syncHomeIntroLinkControls();
-      refreshHomeIntroPreview();
-      inputPageEssayTitle.value = settings.page.essay?.title || '';
-      inputPageEssaySubtitle.value = settings.page.essay?.subtitle || '';
-      inputPageArchiveTitle.value = settings.page.archive?.title || '';
-      inputPageArchiveSubtitle.value = settings.page.archive?.subtitle || '';
-      inputPageBitsTitle.value = settings.page.bits?.title || '';
-      inputPageBitsSubtitle.value = settings.page.bits?.subtitle || '';
-      inputPageMemoTitle.value = settings.page.memo?.title || '';
-      inputPageMemoSubtitle.value = settings.page.memo?.subtitle || '';
-      inputPageAboutTitle.value = settings.page.about?.title || '';
-      inputPageAboutSubtitle.value = settings.page.about?.subtitle || '';
-      inputPageBitsAuthorName.value = settings.page.bits?.defaultAuthor?.name || '';
-      inputPageBitsAuthorAvatar.value = settings.page.bits?.defaultAuthor?.avatar || '';
-      inputHomeShowHero.checked = (settings.home.heroPresetId || 'default') !== 'none';
-      inputHeroImageSrc.value = settings.home.heroImageSrc || '';
-      inputHeroImageAlt.value = settings.home.heroImageAlt || ADMIN_HERO_IMAGE_ALT_DEFAULT;
-      syncHeroControls();
-      syncFooterYearControls();
-      inputCodeLineNumbers.checked = Boolean(settings.ui?.codeBlock?.showLineNumbers);
-      inputReadingEntry.checked = Boolean(settings.ui?.readingMode?.showEntry);
-      applySidebarDividerVariant(settings.ui?.layout?.sidebarDivider || ADMIN_SIDEBAR_DIVIDER_DEFAULT);
-      refreshFooterPreview();
-
-      const navMap = new Map<SidebarNavId, EditableNavItem>(settings.shell.nav.map((item) => [item.id, item]));
-      getNavRows().forEach((row, index) => {
-        const rawId = row.getAttribute('data-nav-id')?.trim() ?? '';
-        const id = isAdminNavId(rawId) ? rawId : ADMIN_NAV_IDS[index] ?? 'essay';
-        const current = navMap.get(id);
-        const labelInput = query<HTMLInputElement>(row, '[data-nav-field="label"]');
-        const ornamentInput = query<HTMLInputElement>(row, '[data-nav-field="ornament"]');
-        const orderInput = query<HTMLInputElement>(row, '[data-nav-field="order"]');
-        const visibleInput = query<HTMLInputElement>(row, '[data-nav-field="visible"]');
-        if (labelInput) labelInput.value = current?.label?.trim() || '';
-        if (ornamentInput) ornamentInput.value = current?.ornament ?? '';
-        if (orderInput) orderInput.value = String(current?.order ?? (index + 1));
-        if (visibleInput) visibleInput.checked = Boolean(current?.visible);
-      });
-    };
-
-    const validateSettings = (settings: EditableSettings): ValidationIssue[] => {
-      const issues: ValidationIssue[] = [];
-      const pushIssue = (message: string, focusTarget?: () => HTMLElement | null): void => {
-        issues.push(createIssue(message, focusTarget));
-      };
-
-      if (!settings.site.title) pushIssue('站点标题不能为空', () => inputSiteTitle);
-      if (!settings.site.description) pushIssue('站点描述不能为空', () => inputSiteDescription);
-      if (!settings.site.defaultLocale) {
-        pushIssue('默认语言不能为空', () => inputSiteDefaultLocale);
-      } else if (!ADMIN_LOCALE_RE.test(settings.site.defaultLocale)) {
-        pushIssue('默认语言格式无效（示例：zh-CN）', () => inputSiteDefaultLocale);
-      }
-
-      if (!Number.isInteger(settings.site.footer?.startYear)) {
-        pushIssue('页脚起始年份必须是整数', () => inputSiteFooterStartYear);
-      } else if (
-        settings.site.footer.startYear < ADMIN_FOOTER_START_YEAR_MIN ||
-        settings.site.footer.startYear > footerStartYearMax
-      ) {
-        pushIssue('页脚起始年份超出允许范围', () => inputSiteFooterStartYear);
-      }
-
-      if (typeof settings.site.footer?.showCurrentYear !== 'boolean') {
-        pushIssue('是否显示当前年必须是布尔值', () => inputSiteFooterShowCurrentYear);
-      }
-
-      if (!settings.site.footer?.copyright) {
-        pushIssue('页脚版权行不能为空', () => inputSiteFooterCopyright);
-      } else if (
-        settings.site.footer.copyright.includes('\n') ||
-        settings.site.footer.copyright.includes('\r')
-      ) {
-        pushIssue('页脚版权行只允许单行文本', () => inputSiteFooterCopyright);
-      } else if (settings.site.footer.copyright.length > ADMIN_FOOTER_COPYRIGHT_MAX_LENGTH) {
-        pushIssue(`页脚版权行不能超过 ${ADMIN_FOOTER_COPYRIGHT_MAX_LENGTH} 个字符`, () => inputSiteFooterCopyright);
-      }
-
-      if (
-        settings.site.socialLinks?.github &&
-        !isAdminAllowedHttpsUrl(settings.site.socialLinks.github, ADMIN_GITHUB_HOSTS)
-      ) {
-        pushIssue('GitHub 链接只允许 https://github.com/... ', () => inputSiteSocialGithub);
-      }
-      if (
-        settings.site.socialLinks?.x &&
-        !isAdminAllowedHttpsUrl(settings.site.socialLinks.x, ADMIN_X_HOSTS)
-      ) {
-        pushIssue('X / Twitter 链接只允许 https://x.com/... 或 https://twitter.com/... ', () => inputSiteSocialX);
-      }
-      if (
-        settings.site.socialLinks?.email &&
-        !ADMIN_EMAIL_RE.test(normalizeEmail(settings.site.socialLinks.email))
-      ) {
-        pushIssue('Email 必须是合法邮箱地址', () => inputSiteSocialEmail);
-      }
-
-      const presetOrder = settings.site.socialLinks.presetOrder;
-      const customLinks = Array.isArray(settings.site.socialLinks?.custom) ? settings.site.socialLinks.custom : [];
-      const socialOrderIssues = getAdminSocialOrderIssues(
-        presetOrder,
-        customLinks.map((item, index) => ({
-          key: String(index),
-          order: item.order
-        }))
-      );
-      const presetOrderIssues = new Map<SiteSocialPresetId, 'range' | 'duplicate'>();
-      const customOrderIssues = new Map<number, 'range' | 'duplicate'>();
-
-      socialOrderIssues.forEach((issue) => {
-        if (issue.scope === 'preset') {
-          if (isAdminSocialPresetId(issue.key)) {
-            presetOrderIssues.set(issue.key, issue.type);
-          }
-          return;
-        }
-
-        const index = Number.parseInt(issue.key, 10);
-        if (Number.isInteger(index)) {
-          customOrderIssues.set(index, issue.type);
-        }
-      });
-
-      ADMIN_SOCIAL_PRESET_IDS.forEach((id) => {
-        const order = presetOrder[id];
-        const rowLabel = id === 'github' ? 'GitHub' : id === 'x' ? 'X / Twitter' : 'Email';
-        const orderIssue = presetOrderIssues.get(id);
-        if (orderIssue === 'range') {
-          pushIssue(
-            `${rowLabel} 的位置排序必须为 ${ADMIN_SOCIAL_ORDER_MIN}-${ADMIN_SOCIAL_ORDER_MAX} 的整数`,
-            getPresetFieldTarget(id, 'order')
-          );
-          return;
-        }
-        if (orderIssue === 'duplicate') {
-          pushIssue(`社交链接位置排序不能重复：${order}`, getPresetFieldTarget(id, 'order'));
-        }
-      });
-
-      if (customLinks.length > ADMIN_SOCIAL_CUSTOM_LIMIT) {
-        pushIssue(`自定义链接最多只能添加 ${ADMIN_SOCIAL_CUSTOM_LIMIT} 条`, () => socialCustomAddBtn);
-      }
-
-      const seenCustomIds = new Set<string>();
-      customLinks.forEach((item, index) => {
-        const rowLabel = `自定义链接 #${index + 1}`;
-        if (!item.id) {
-          pushIssue(`${rowLabel} 的 ID 不能为空`, getCustomFieldTarget(index, 'id'));
-        } else {
-          if (item.id.includes('\n') || item.id.includes('\r')) {
-            pushIssue(`${rowLabel} 的 ID 只允许单行文本`, getCustomFieldTarget(index, 'id'));
-          }
-          if (seenCustomIds.has(item.id)) {
-            pushIssue(`自定义链接 ID 重复：${item.id}`, getCustomFieldTarget(index, 'id'));
-          }
-          seenCustomIds.add(item.id);
-        }
-
-        if (!item.label) {
-          pushIssue(`${rowLabel} 的显示名称不能为空`, getCustomFieldTarget(index, 'label'));
-        } else if (item.label.includes('\n') || item.label.includes('\r')) {
-          pushIssue(`${rowLabel} 的显示名称只允许单行文本`, getCustomFieldTarget(index, 'label'));
-        }
-
-        if (!item.href || !isAdminAllowedHttpsUrl(item.href)) {
-          pushIssue(`${rowLabel} 的链接必须是合法 https:// 地址`, getCustomFieldTarget(index, 'href'));
-        }
-        if (!isAdminSocialIconKey(item.iconKey)) {
-          pushIssue(`${rowLabel} 的图标必须从白名单中选择`, getCustomFieldTarget(index, 'iconKey'));
-        }
-        const orderIssue = customOrderIssues.get(index);
-        if (orderIssue === 'range') {
-          pushIssue(
-            `${rowLabel} 的位置排序必须为 ${ADMIN_SOCIAL_ORDER_MIN}-${ADMIN_SOCIAL_ORDER_MAX} 的整数`,
-            getCustomFieldTarget(index, 'order')
-          );
-        } else if (orderIssue === 'duplicate') {
-          pushIssue(`社交链接位置排序不能重复：${item.order}`, getCustomFieldTarget(index, 'order'));
-        }
-        if (typeof item.visible !== 'boolean') {
-          pushIssue(`${rowLabel} 的 visible 必须是布尔值`, getCustomVisibilityTarget(index));
-        }
-      });
-
-      if (!settings.shell.brandTitle) pushIssue('侧栏站点名不能为空', () => inputShellBrandTitle);
-      if (!settings.shell.quote) pushIssue('侧栏引用文案不能为空', () => inputShellQuote);
-
-      if (!settings.home.introLead) {
-        pushIssue('首页导语主文案不能为空', () => inputHomeIntroLead);
-      } else if (settings.home.introLead.length > ADMIN_HOME_INTRO_MAX_LENGTH) {
-        pushIssue(`首页导语主文案不能超过 ${ADMIN_HOME_INTRO_MAX_LENGTH} 个字符`, () => inputHomeIntroLead);
-      }
-
-      if (typeof settings.home.showIntroLead !== 'boolean') {
-        pushIssue('首页导语主文案展示开关必须是布尔值', () => inputHomeShowIntroLead);
-      }
-
-      if (!settings.home.introMore) {
-        pushIssue('首页导语补充文案不能为空', () => inputHomeIntroMore);
-      } else if (settings.home.introMore.length > ADMIN_HOME_INTRO_MAX_LENGTH) {
-        pushIssue(`首页导语补充文案不能超过 ${ADMIN_HOME_INTRO_MAX_LENGTH} 个字符`, () => inputHomeIntroMore);
-      }
-
-      if (typeof settings.home.showIntroMore !== 'boolean') {
-        pushIssue('首页导语补充文案展示开关必须是布尔值', () => inputHomeShowIntroMore);
-      }
-
-      if (!Array.isArray(settings.home.introMoreLinks)) {
-        pushIssue('首页导语补充链接必须是数组', () => inputHomeIntroMoreLinkPrimary);
-      } else if (
-        settings.home.introMoreLinks.length < 1 ||
-        settings.home.introMoreLinks.length > ADMIN_HOME_INTRO_LINK_LIMIT
-      ) {
-        pushIssue(`首页导语补充链接必须选择 1-${ADMIN_HOME_INTRO_LINK_LIMIT} 个入口`, () => inputHomeIntroMoreLinkPrimary);
-      } else {
-        const seenHomeIntroLinks = new Set<HomeIntroLinkKey>();
-        settings.home.introMoreLinks.forEach((linkKey, index) => {
-          if (!isAdminHomeIntroLinkKey(linkKey)) {
-            pushIssue(`首页导语补充链接 #${index + 1} 非法：${String(linkKey)}`, () => inputHomeIntroMoreLinkPrimary);
-            return;
-          }
-          if (seenHomeIntroLinks.has(linkKey)) {
-            pushIssue(`首页导语补充链接不能重复：${linkKey}`, () => inputHomeIntroMoreLinkPrimary);
-            return;
-          }
-          seenHomeIntroLinks.add(linkKey);
-        });
-      }
-
-      if (!ADMIN_HERO_PRESET_SET.has(settings.home.heroPresetId)) {
-        pushIssue('Hero 展示模式只允许 default/none', () => inputHomeShowHero);
-      }
-
-      if (
-        settings.home.heroImageSrc !== null &&
-        normalizeAdminHeroImageSrc(settings.home.heroImageSrc) === undefined
-      ) {
-        pushIssue(
-          'Hero 图片地址只允许 src/assets/**、public/**（或 / 开头路径）以及 https:// 图片地址',
-          () => inputHeroImageSrc
-        );
-      }
-
-      if (!settings.home.heroImageAlt) {
-        pushIssue('Hero 图片说明不能为空', () => inputHeroImageAlt);
-      } else if (
-        settings.home.heroImageAlt.includes('\n') ||
-        settings.home.heroImageAlt.includes('\r')
-      ) {
-        pushIssue('Hero 图片说明只允许单行文本', () => inputHeroImageAlt);
-      } else if (settings.home.heroImageAlt.length > ADMIN_HERO_IMAGE_ALT_MAX_LENGTH) {
-        pushIssue(`Hero 图片说明不能超过 ${ADMIN_HERO_IMAGE_ALT_MAX_LENGTH} 个字符`, () => inputHeroImageAlt);
-      }
-
-      const pageTitleMap: Array<[string | null, string, () => HTMLElement | null]> = [
-        [settings.page.essay?.title, '/essay/ 页面主标题', () => inputPageEssayTitle],
-        [settings.page.archive?.title, '/archive/ 页面主标题', () => inputPageArchiveTitle],
-        [settings.page.bits?.title, '/bits/ 页面主标题', () => inputPageBitsTitle],
-        [settings.page.memo?.title, '/memo/ 页面主标题', () => inputPageMemoTitle],
-        [settings.page.about?.title, '/about/ 页面主标题', () => inputPageAboutTitle]
-      ];
-
-      pageTitleMap.forEach(([title, label, focusTarget]) => {
-        if (title == null) return;
-        if (typeof title !== 'string') {
-          pushIssue(`${label} 必须是字符串或留空`, focusTarget);
-          return;
-        }
-        if (title.includes('\n') || title.includes('\r')) {
-          pushIssue(`${label} 只允许单行文本`, focusTarget);
-        }
-        if (title.length > ADMIN_PAGE_TITLE_MAX_LENGTH) {
-          pushIssue(`${label} 不能超过 ${ADMIN_PAGE_TITLE_MAX_LENGTH} 个字符`, focusTarget);
-        }
-      });
-
-      const pageSubtitleMap: Array<[string | null, string, () => HTMLElement | null]> = [
-        [settings.page.essay?.subtitle, '/essay/ 页面副标题', () => inputPageEssaySubtitle],
-        [settings.page.archive?.subtitle, '/archive/ 页面副标题', () => inputPageArchiveSubtitle],
-        [settings.page.bits?.subtitle, '/bits/ 页面副标题', () => inputPageBitsSubtitle],
-        [settings.page.memo?.subtitle, '/memo/ 页面副标题', () => inputPageMemoSubtitle],
-        [settings.page.about?.subtitle, '/about/ 页面副标题', () => inputPageAboutSubtitle]
-      ];
-
-      pageSubtitleMap.forEach(([subtitle, label, focusTarget]) => {
-        if (subtitle == null) return;
-        if (typeof subtitle !== 'string') {
-          pushIssue(`${label} 必须是字符串或留空`, focusTarget);
-          return;
-        }
-        if (subtitle.includes('\n') || subtitle.includes('\r')) {
-          pushIssue(`${label} 只允许单行文本`, focusTarget);
-        }
-        if (subtitle.length > ADMIN_PAGE_SUBTITLE_MAX_LENGTH) {
-          pushIssue(`${label} 不能超过 ${ADMIN_PAGE_SUBTITLE_MAX_LENGTH} 个字符`, focusTarget);
-        }
-      });
-
-      if (!settings.page.bits?.defaultAuthor?.name) {
-        pushIssue('Bits 默认作者名不能为空', () => inputPageBitsAuthorName);
-      }
-      if (settings.page.bits?.defaultAuthor?.avatar) {
-        if (normalizeAdminBitsAvatarPath(settings.page.bits.defaultAuthor.avatar) === undefined) {
-          pushIssue(
-            'Bits 默认头像只允许相对图片路径（例如 author/avatar.webp），不要带 public/、不要以 / 开头，也不要包含 URL、..、?、#',
-            () => inputPageBitsAuthorAvatar
-          );
-        }
-      }
-
-      if (!isAdminSidebarDividerVariant(settings.ui?.layout?.sidebarDivider ?? '')) {
-        pushIssue('侧栏分隔线只允许 默认 / 弱化 / 隐藏', () => inputSidebarDividerDefault);
-      }
-
-      const nav = Array.isArray(settings.shell.nav) ? settings.shell.nav : [];
-      if (nav.length !== ADMIN_NAV_IDS.length) {
-        pushIssue('Sidebar 导航项数量必须与既有导航一致', getFirstNavLabelTarget());
-      }
-
-      const seenIds = new Set<SidebarNavId>();
-      const seenOrders = new Set<number>();
-      nav.forEach((item) => {
-        const navId = isAdminNavId(item.id) ? item.id : null;
-        if (!navId) {
-          pushIssue(`存在非法导航项 ID：${item.id}`, getFirstNavLabelTarget());
-        } else if (seenIds.has(navId)) {
-          pushIssue(`导航项 ID 重复：${navId}`, getNavFieldTarget(navId, 'label'));
-        }
-        if (navId) seenIds.add(navId);
-
-        if (!item.label) {
-          pushIssue(
-            `导航项 ${item.id} 的显示名称不能为空`,
-            navId ? getNavFieldTarget(navId, 'label') : getFirstNavLabelTarget()
-          );
-        }
-        if (item.ornament !== null) {
-          if (typeof item.ornament !== 'string') {
-            pushIssue(
-              `导航项 ${item.id} 的点缀必须是字符串或留空`,
-              navId ? getNavFieldTarget(navId, 'ornament') : getFirstNavLabelTarget()
-            );
-          } else if (item.ornament.includes('\n') || item.ornament.includes('\r')) {
-            pushIssue(
-              `导航项 ${item.id} 的点缀只允许单行文本`,
-              navId ? getNavFieldTarget(navId, 'ornament') : getFirstNavLabelTarget()
-            );
-          } else if (item.ornament.length > ADMIN_NAV_ORNAMENT_MAX_LENGTH) {
-            pushIssue(
-              `导航项 ${item.id} 的点缀不能超过 ${ADMIN_NAV_ORNAMENT_MAX_LENGTH} 个字符`,
-              navId ? getNavFieldTarget(navId, 'ornament') : getFirstNavLabelTarget()
-            );
-          }
-        }
-        if (!Number.isInteger(item.order) || item.order < 1 || item.order > 999) {
-          pushIssue(
-            `导航项 ${item.id} 的位置排序必须为 1-999 的整数`,
-            navId ? getNavFieldTarget(navId, 'order') : getFirstNavLabelTarget()
-          );
-        }
-        if (seenOrders.has(item.order)) {
-          pushIssue(
-            `位置排序不能重复：${item.order}`,
-            navId ? getNavFieldTarget(navId, 'order') : getFirstNavLabelTarget()
-          );
-        }
-        seenOrders.add(item.order);
-        if (typeof item.visible !== 'boolean') {
-          pushIssue(
-            `导航项 ${item.id} 的 visible 必须是布尔值`,
-            navId ? getNavFieldTarget(navId, 'visible') : getFirstNavLabelTarget()
-          );
-        }
-      });
-
-      return issues;
     };
 
     const refreshDirty = (): void => {
@@ -1596,13 +541,26 @@ if (!root) {
 
     const extractSettingsPayload = (payload: unknown): ThemeSettingsEditablePayload | null => {
       if (!isRecord(payload)) return null;
-      if (isRecord(payload.settings)) return payload as unknown as ThemeSettingsEditablePayload;
+      if (typeof payload.revision === 'string' && isRecord(payload.settings)) {
+        return payload as unknown as ThemeSettingsEditablePayload;
+      }
 
       const nestedPayload = payload.payload;
-      if (payload.ok === true && isRecord(nestedPayload) && isRecord(nestedPayload.settings)) {
+      if (
+        isRecord(nestedPayload) &&
+        typeof nestedPayload.revision === 'string' &&
+        isRecord(nestedPayload.settings)
+      ) {
         return nestedPayload as unknown as ThemeSettingsEditablePayload;
       }
       return null;
+    };
+
+    const extractInvalidSettingsState = (payload: unknown): ThemeSettingsEditableErrorState | null => {
+      if (!isRecord(payload)) return null;
+      if (payload.ok !== false || payload.mode !== 'invalid-settings') return null;
+      if (typeof payload.message !== 'string' || !Array.isArray(payload.errors)) return null;
+      return payload as unknown as ThemeSettingsEditableErrorState;
     };
 
     const getPayloadMessage = (payload: unknown): string | null =>
@@ -1613,22 +571,116 @@ if (!root) {
       return payload.errors.filter((error): error is string => typeof error === 'string' && error.length > 0);
     };
 
+    const getDiagnosticHeadline = (diagnostic: ThemeSettingsReadDiagnostic): string => {
+      const fileName = diagnostic.path.split('/').pop() || diagnostic.path;
+      if (diagnostic.code === 'invalid-json') return `${fileName} 格式错误`;
+      if (diagnostic.code === 'invalid-root') return `${fileName} 结构错误`;
+      return `${fileName} 读取失败`;
+    };
+
+    const createDiagnosticMeta = (label: string, value: string, options: { mono?: boolean } = {}): HTMLElement => {
+      const row = document.createElement('div');
+      row.className = 'admin-banner__meta';
+
+      const labelEl = document.createElement('span');
+      labelEl.className = 'admin-banner__meta-label';
+      labelEl.textContent = label;
+
+      const valueEl = document.createElement(options.mono ? 'code' : 'span');
+      valueEl.className = options.mono ? 'admin-banner__meta-value admin-banner__meta-value--mono' : 'admin-banner__meta-value';
+      valueEl.textContent = value;
+
+      row.append(labelEl, valueEl);
+      return row;
+    };
+
+    const createDiagnosticListItem = (diagnostic: ThemeSettingsReadDiagnostic): HTMLElement => {
+      const item = document.createElement('li');
+      item.className = 'admin-banner__list-item admin-banner__list-item--diagnostic';
+
+      const title = document.createElement('p');
+      title.className = 'admin-banner__item-title';
+      title.textContent = getDiagnosticHeadline(diagnostic);
+      item.appendChild(title);
+
+      item.appendChild(createDiagnosticMeta('文件', diagnostic.path, { mono: true }));
+
+      if (typeof diagnostic.line === 'number' && typeof diagnostic.column === 'number') {
+        item.appendChild(createDiagnosticMeta('位置', `第 ${diagnostic.line} 行，第 ${diagnostic.column} 列`));
+      }
+
+      if (diagnostic.detail) {
+        item.appendChild(createDiagnosticMeta('技术细节', diagnostic.detail, { mono: true }));
+      }
+
+      return item;
+    };
+
+    const setInvalidSettingsErrorBanner = (invalidState: ThemeSettingsEditableErrorState): void => {
+      setErrorBanner({
+        title: '已切换为只读保护',
+        message: '检测到 settings 配置文件损坏。请先修复文件，再点击“重新检查”或刷新当前页面。',
+        items: invalidState.diagnostics.map((diagnostic) => createDiagnosticListItem(diagnostic)),
+        retryable: true
+      });
+    };
+
+    const applyInvalidSettingsState = (
+      payload: unknown,
+      options: { announceStatus?: boolean; revealError?: boolean } = {}
+    ): boolean => {
+      const invalidState = extractInvalidSettingsState(payload);
+      if (!invalidState) return false;
+
+      currentRevision = null;
+      baseline = null;
+      clearInvalidFields();
+      setDirty(false);
+      setConsoleLocked(true);
+      setInvalidSettingsErrorBanner(invalidState);
+      setStatus(
+        'error',
+        STATUS_INVALID_SETTINGS,
+        options.announceStatus === undefined ? {} : { announce: options.announceStatus }
+      );
+      if (options.revealError) {
+        revealErrorState();
+      }
+
+      return true;
+    };
+
     const loadPayload = (
       payload: unknown,
       source: LoadSource,
       options: { announceStatus?: boolean } = {}
     ): void => {
+      if (
+        applyInvalidSettingsState(
+          payload,
+          options.announceStatus === undefined ? {} : { announceStatus: options.announceStatus }
+        )
+      ) {
+        return;
+      }
+
       const resolvedPayload = extractSettingsPayload(payload);
       if (!resolvedPayload) {
         clearInvalidFields();
         setStatus('error', '返回数据格式无效');
+        setErrors([getPayloadMessage(payload) || '配置接口返回了无效的 payload'], { title: '读取配置失败' });
+        revealErrorState();
         return;
       }
+
+      setConsoleLocked(false);
+      currentRevision = resolvedPayload.revision;
       const normalized = canonicalize(resolvedPayload.settings);
       applySettings(normalized);
+      finalizeAppliedSettings();
       baseline = canonicalize(collectSettings());
       clearInvalidFields();
-      setErrors([]);
+      clearErrorBanner();
       setDirty(false);
       setStatus(
         'ready',
@@ -1640,6 +692,9 @@ if (!root) {
     const loadBootstrap = (): void => {
       try {
         const payload = JSON.parse(bootstrapEl.textContent || '{}') as unknown;
+        if (applyInvalidSettingsState(payload, { announceStatus: false })) {
+          return;
+        }
         loadPayload(payload, 'bootstrap', { announceStatus: false });
       } catch (error) {
         setStatus('error', '初始化数据解析失败');
@@ -1655,19 +710,29 @@ if (!root) {
           headers: { Accept: 'application/json' },
           cache: 'no-store'
         });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        const payload = (await response.json().catch(() => null)) as unknown;
+        if (applyInvalidSettingsState(payload, { announceStatus: false })) {
+          return;
         }
-        const payload = (await response.json()) as unknown;
+        if (!response.ok) {
+          throw new Error(getPayloadMessage(payload) || `HTTP ${response.status}`);
+        }
         if (!extractSettingsPayload(payload)) {
           throw new Error(getPayloadMessage(payload) || '返回数据格式无效');
         }
         loadPayload(payload, 'remote');
       } catch (error) {
-        setStatus('warn', '接口读取失败，继续使用初始配置');
+        if (!isConsoleLocked) {
+          setStatus('warn', '接口读取失败，继续使用初始配置');
+        }
         console.warn(error);
       }
     };
+
+    errorRetryBtn.addEventListener('click', () => {
+      if (!isConsoleLocked) return;
+      void loadFromApi();
+    });
 
     form.addEventListener('input', (event) => {
       const target = event.target;
@@ -1680,6 +745,7 @@ if (!root) {
       }
       refreshDirty();
     });
+
     form.addEventListener('change', (event) => {
       const target = event.target;
       if (
@@ -1691,6 +757,7 @@ if (!root) {
       }
       refreshDirty();
     });
+
     inputSiteFooterStartYear.addEventListener('input', refreshFooterPreview);
     inputSiteFooterShowCurrentYear.addEventListener('change', () => {
       syncFooterYearControls();
@@ -1872,7 +939,7 @@ if (!root) {
         const visibleInput = query<HTMLInputElement>(row, '[data-social-custom-field="visible"]');
         if (!(visibleInput instanceof HTMLInputElement)) return;
         visibleInput.checked = !visibleInput.checked;
-        syncCustomVisibilityButton(row);
+        syncCustomRow(row);
         normalizeSocialOrders();
         refreshDirty();
       }
@@ -1893,8 +960,9 @@ if (!root) {
     resetBtn.addEventListener('click', () => {
       if (!baseline) return;
       applySettings(deepClone(baseline));
+      finalizeAppliedSettings();
       clearInvalidFields();
-      setErrors([]);
+      clearErrorBanner();
       setDirty(false);
       setStatus('ready', '已重置为最近一次加载值');
     });
@@ -1914,10 +982,21 @@ if (!root) {
       setStatus('loading', '正在保存到 src/data/settings/*.json');
 
       try {
-        const requestBody = JSON.stringify(current);
+        if (!currentRevision) {
+          clearInvalidFields();
+          setErrors(['当前配置缺少 revision，请先同步最新配置后再保存'], { title: '保存前需要重新同步配置' });
+          setStatus('error', '保存失败', { announce: false });
+          revealErrorState();
+          return;
+        }
+
+        const requestBody = JSON.stringify({
+          revision: currentRevision,
+          settings: current
+        });
         if (!requestBody) {
           clearInvalidFields();
-          setErrors(['保存请求体为空，请刷新页面后重试']);
+          setErrors(['保存请求体为空，请刷新页面后重试'], { title: '保存请求无效' });
           setStatus('error', '保存失败', { announce: false });
           revealErrorState();
           return;
@@ -1936,8 +1015,22 @@ if (!root) {
         const payload = (await response.json().catch(() => null)) as unknown;
         if (!response.ok || !isRecord(payload) || payload.ok !== true) {
           clearInvalidFields();
+          if (applyInvalidSettingsState(payload, { announceStatus: false, revealError: true })) {
+            return;
+          }
+
           const serverErrors = getPayloadErrors(payload);
-          setErrors(serverErrors.length ? serverErrors : ['保存失败，请稍后重试']);
+          if (response.status === 409 && extractSettingsPayload(payload)) {
+            loadPayload(payload, 'remote', { announceStatus: false });
+            setErrors(serverErrors.length ? serverErrors : ['配置已更新，已同步最新配置，请重新确认后再保存'], {
+              title: '检测到外部更新'
+            });
+            setStatus('warn', '检测到外部更新，已同步最新配置', { announce: false });
+            revealErrorState();
+            return;
+          }
+
+          setErrors(serverErrors.length ? serverErrors : ['保存失败，请稍后重试'], { title: '保存失败' });
           if (response.status === 404) {
             setStatus('error', '当前环境不允许写入（仅 DEV 可写）', { announce: false });
           } else {
@@ -1956,11 +1049,11 @@ if (!root) {
           setStatus('ok', '保存成功');
         }
         clearInvalidFields();
-        setErrors([]);
+        clearErrorBanner();
       } catch (error) {
         console.error(error);
         clearInvalidFields();
-        setErrors(['保存请求失败，请检查本地服务日志']);
+        setErrors(['保存请求失败，请检查本地服务日志'], { title: '保存请求失败' });
         setStatus('error', '保存失败', { announce: false });
         revealErrorState();
       } finally {

@@ -41,12 +41,26 @@ const removeLabel = `${row.label} 为固定项，不可删除`;
 
   <div class="admin-field admin-social-field admin-social-field--platform admin-social-field--static">
     <span class="admin-social-cell-label">平台</span>
-    <input class="admin-social-static-input" type="text" value={row.label} readonly tabindex="-1" />
+    <input
+      class="admin-social-static-input"
+      name={`site-social-${row.id}-platform-display`}
+      type="text"
+      value={row.label}
+      readonly
+      tabindex="-1"
+    />
   </div>
 
   <div class="admin-field admin-social-field admin-social-field--id admin-social-field--static">
     <span class="admin-social-cell-label">链接代号</span>
-    <input class="admin-social-static-input admin-social-static-input--code" type="text" value={row.id} readonly tabindex="-1" />
+    <input
+      class="admin-social-static-input admin-social-static-input--code"
+      name={`site-social-${row.id}-id-display`}
+      type="text"
+      value={row.id}
+      readonly
+      tabindex="-1"
+    />
   </div>
 
   <div class="admin-social-field admin-social-field--icon admin-social-field--static">

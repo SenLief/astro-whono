@@ -26,9 +26,14 @@ The format is based on Keep a Changelog, and this project aims to follow Semanti
 - 修复标签结果页中多标签文章可能显示错误标签的问题；当前列表项会优先展示正在浏览的标签。
 - 修复 `/bits/` 搜索与年份筛选在快速输入、切换较早年份或内容年份更新后，可能出现的结果不同步与旧索引问题。
 - 修复 Theme Console 在开发环境下可能沿用旧配置缓存，或在外部配置变更后覆盖无关设置的问题。
+- 修复 Theme Console 在 `src/data/settings/*.json` 损坏时仍静默回退并允许继续保存的问题；当前会显式提示损坏文件并阻止覆盖坏配置。
+
+## Maintenance
+- 整理 Theme Console 客户端脚本结构，将表单序列化、字段校验与社交链接交互拆分为独立模块，便于后续维护与迭代；现有配置格式与交互语义保持不变。
 
 ## Notes
 - 标签浏览依附现有 `/archive/` 与 `/essay/` 页面，不新增独立的 Tags 导航页。
+
 
 ## [0.2.0] - 2026-03-13
 本次更新聚焦本地 Theme Console，方便 fork 或 clone 后更快接管站点配置。

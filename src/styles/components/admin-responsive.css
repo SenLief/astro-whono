@@ -13,6 +13,20 @@
     transform: translateY(0);
   }
 
+  .admin-banner__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-banner__retry {
+    align-self: flex-start;
+  }
+
+  .admin-banner__meta {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
   .admin-grid {
     grid-template-columns: 1fr;
   }

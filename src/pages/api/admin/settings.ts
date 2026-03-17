@@ -3,8 +3,9 @@ import { access, mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { APIRoute } from 'astro';
 import {
-  getEditableThemeSettingsPayload,
+  getEditableThemeSettingsState,
   getThemeSettings,
+  getThemeSettingsRevision,
   resetThemeSettingsCache,
   type HeroPresetId,
   type HomeIntroLinkKey,
@@ -483,6 +484,29 @@ const createResults = (writtenGroups: WritableGroup[]) => ({
   page: { received: writtenGroups.includes('page'), written: false },
   ui: { received: writtenGroups.includes('ui'), written: false }
 });
+
+const extractWriteInput = (
+  input: unknown
+): { settingsInput: unknown; revision: string | null; errors: string[] } => {
+  if (!isRecord(input)) {
+    return { settingsInput: null, revision: null, errors: ['请求体必须是 JSON 对象'] };
+  }
+
+  const revision = toTrimmedString(input.revision) ?? null;
+  const errors = revision ? [] : ['请求体缺少 revision，请先同步最新配置后再保存'];
+
+  if (Object.prototype.hasOwnProperty.call(input, 'settings')) {
+    collectUnknownKeys('root', input, ['revision', 'settings'], errors);
+    return { settingsInput: input.settings, revision, errors };
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, 'revision')) {
+    const { revision: _revision, ...settingsInput } = input;
+    return { settingsInput, revision, errors };
+  }
+
+  return { settingsInput: input, revision, errors };
+};
 
 const parsePatch = (
   input: unknown,
@@ -1112,9 +1136,12 @@ const persistSettingsTransaction = async (entries: PersistEntry[]): Promise<Writ
 
 export const GET: APIRoute = async () => {
   const payload = import.meta.env.DEV
-    ? { ok: true, payload: getEditableThemeSettingsPayload() }
+    ? getEditableThemeSettingsState()
     : { ok: false, mode: 'readonly', message: ADMIN_READONLY_MESSAGE };
-  return new Response(JSON.stringify(payload, null, 2), { headers: JSON_HEADERS });
+  return new Response(JSON.stringify(payload, null, 2), {
+    status: import.meta.env.DEV && payload.ok === false ? 500 : 200,
+    headers: JSON_HEADERS
+  });
 };
 
 export const POST: APIRoute = async ({ request, url }) => {
@@ -1136,6 +1163,14 @@ export const POST: APIRoute = async ({ request, url }) => {
       ),
       { status: requestError.status, headers: JSON_HEADERS }
     );
+  }
+
+  const editableState = getEditableThemeSettingsState();
+  if (!editableState.ok) {
+    return new Response(JSON.stringify(editableState, null, 2), {
+      status: 409,
+      headers: JSON_HEADERS
+    });
   }
 
   let body: unknown;
@@ -1164,8 +1199,54 @@ export const POST: APIRoute = async ({ request, url }) => {
     );
   }
 
+  const {
+    settingsInput,
+    revision,
+    errors: writeInputErrors
+  } = extractWriteInput(body);
+  if (writeInputErrors.length) {
+    return new Response(
+      JSON.stringify(
+        {
+          ok: false,
+          errors: writeInputErrors,
+          results: createResults([])
+        },
+        null,
+        2
+      ),
+      { status: 400, headers: JSON_HEADERS }
+    );
+  }
+
+  const currentRevision = getThemeSettingsRevision();
+  if (revision !== currentRevision) {
+    resetThemeSettingsCache();
+    const latestEditableState = getEditableThemeSettingsState();
+    if (!latestEditableState.ok) {
+      return new Response(JSON.stringify(latestEditableState, null, 2), {
+        status: 409,
+        headers: JSON_HEADERS
+      });
+    }
+
+    return new Response(
+      JSON.stringify(
+        {
+          ok: false,
+          errors: ['检测到配置已在外部更新，已拒绝覆盖并同步最新配置，请确认后再保存'],
+          results: createResults([]),
+          payload: latestEditableState.payload
+        },
+        null,
+        2
+      ),
+      { status: 409, headers: JSON_HEADERS }
+    );
+  }
+
   const current = getThemeSettings().settings;
-  const { patch, writtenGroups, errors } = parsePatch(body, current);
+  const { patch, writtenGroups, errors } = parsePatch(settingsInput, current);
 
   if (errors.length) {
     return new Response(
@@ -1192,14 +1273,29 @@ export const POST: APIRoute = async ({ request, url }) => {
     }
 
     resetThemeSettingsCache();
-    const payload = getEditableThemeSettingsPayload();
+    const latestEditableState = getEditableThemeSettingsState();
+    if (!latestEditableState.ok) {
+      console.error('[astro-whono] Settings persisted but failed to reload editable payload:', latestEditableState);
+      return new Response(
+        JSON.stringify(
+          {
+            ok: false,
+            errors: ['配置文件已写入，但重新读取 settings JSON 失败，请先修复损坏文件后再刷新后台'],
+            results
+          },
+          null,
+          2
+        ),
+        { status: 500, headers: JSON_HEADERS }
+      );
+    }
 
     return new Response(
       JSON.stringify(
         {
           ok: true,
           results,
-          payload
+          payload: latestEditableState.payload
         },
         null,
         2

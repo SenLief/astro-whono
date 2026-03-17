@@ -6,7 +6,7 @@ import AdminSidebarSection from '../../components/admin/AdminSidebarSection.astr
 import AdminSiteSection from '../../components/admin/AdminSiteSection.astro';
 import AdminUiSection from '../../components/admin/AdminUiSection.astro';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { getEditableThemeSettingsPayload, type SidebarNavId } from '../../lib/theme-settings';
+import { getEditableThemeSettingsState, type SidebarNavId } from '../../lib/theme-settings';
 import '../../styles/components/admin.css';
 import {
   ADMIN_FOOTER_START_YEAR_MIN,
@@ -44,33 +44,41 @@ const memoTitlePlaceholder = typeof memoEntry?.data.title === 'string' ? memoEnt
 const memoSubtitlePlaceholder =
   typeof memoEntry?.data.subtitle === 'string' ? memoEntry.data.subtitle.trim() : '';
 
-const initialPayload = getEditableThemeSettingsPayload();
-const initialNavMap = new Map(
-  initialPayload.settings.shell.nav.map((item) => [item.id, item])
-);
+const initialState = getEditableThemeSettingsState();
+const bootstrapState = initialState.ok
+  ? (() => {
+      const initialNavMap = new Map(
+        initialState.payload.settings.shell.nav.map((item) => [item.id, item])
+      );
 
-const initialPayloadWithFallbackNav = {
-  settings: {
-    ...initialPayload.settings,
-    shell: {
-      ...initialPayload.settings.shell,
-      nav: navIdOrder.map((id, index) => {
-        const current = initialNavMap.get(id);
-        if (current) return current;
-        return {
-          id,
-          label: navLabelFallback[id],
-          ornament: ADMIN_NAV_ORNAMENT_DEFAULT,
-          visible: true,
-          order: index + 1
-        };
-      })
-    }
-  },
-  sources: initialPayload.sources
-};
+      return {
+        ok: true as const,
+        payload: {
+          revision: initialState.payload.revision,
+          settings: {
+            ...initialState.payload.settings,
+            shell: {
+              ...initialState.payload.settings.shell,
+              nav: navIdOrder.map((id, index) => {
+                const current = initialNavMap.get(id);
+                if (current) return current;
+                return {
+                  id,
+                  label: navLabelFallback[id],
+                  ornament: ADMIN_NAV_ORNAMENT_DEFAULT,
+                  visible: true,
+                  order: index + 1
+                };
+              })
+            }
+          },
+          sources: initialState.payload.sources
+        }
+      };
+    })()
+  : initialState;
 
-const bootstrapJson = JSON.stringify(initialPayloadWithFallbackNav).replace(/</g, '\u003c');
+const bootstrapJson = JSON.stringify(bootstrapState).replace(/</g, '\u003c');
 ---
 
 <BaseLayout title="Theme Console" bodyClass="admin-page">
@@ -90,14 +98,33 @@ const bootstrapJson = JSON.stringify(initialPayloadWithFallbackNav).replace(/</g
           <p id="admin-status" class="admin-status" data-state="idle">等待加载</p>
         </header>
 
-        <p
+        <section
           id="admin-error-banner"
           class="admin-banner admin-banner--error"
           hidden
           role="alert"
           aria-atomic="true"
           tabindex="-1"
-        ></p>
+        >
+          <div class="admin-banner__header">
+            <div class="admin-banner__lead">
+              <span class="admin-banner__icon" aria-hidden="true">×</span>
+              <div class="admin-banner__copy">
+                <p id="admin-error-title" class="admin-banner__title">操作未完成</p>
+                <p id="admin-error-message" class="admin-banner__message" hidden></p>
+              </div>
+            </div>
+            <button
+              id="admin-error-retry"
+              class="admin-btn admin-btn--ghost admin-btn--danger admin-banner__retry"
+              type="button"
+              hidden
+            >
+              重新检查
+            </button>
+          </div>
+          <ul id="admin-error-list" class="admin-banner__list" hidden></ul>
+        </section>
 
         <form id="admin-form" class="admin-form" novalidate>
           <AdminSiteSection

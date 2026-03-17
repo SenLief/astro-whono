@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { site as legacySite } from '../../site.config.mjs';
@@ -234,11 +235,49 @@ export interface EditableThemeSettings extends Omit<ThemeSettings, 'site'> {
 }
 
 export interface ThemeSettingsEditablePayload {
+  revision: string;
   settings: EditableThemeSettings;
   sources: ThemeSettingsSources;
 }
 
+export type ThemeSettingsFileGroup = 'site' | 'shell' | 'home' | 'page' | 'ui';
+
+export interface ThemeSettingsReadDiagnostic {
+  group: ThemeSettingsFileGroup;
+  path: string;
+  code: 'invalid-json' | 'invalid-root' | 'read-failed';
+  message: string;
+  detail?: string;
+  line?: number;
+  column?: number;
+}
+
+export interface ThemeSettingsEditableErrorState {
+  ok: false;
+  mode: 'invalid-settings';
+  message: string;
+  errors: string[];
+  diagnostics: ThemeSettingsReadDiagnostic[];
+}
+
+export type ThemeSettingsEditableState =
+  | {
+      ok: true;
+      payload: ThemeSettingsEditablePayload;
+    }
+  | ThemeSettingsEditableErrorState;
+
 const SETTINGS_DIR = join(process.cwd(), 'src', 'data', 'settings');
+const SETTINGS_FILE_GROUPS: readonly ThemeSettingsFileGroup[] = ['site', 'shell', 'home', 'page', 'ui'];
+const SETTINGS_RELATIVE_PATHS: Record<ThemeSettingsFileGroup, string> = {
+  site: 'src/data/settings/site.json',
+  shell: 'src/data/settings/shell.json',
+  home: 'src/data/settings/home.json',
+  page: 'src/data/settings/page.json',
+  ui: 'src/data/settings/ui.json'
+};
+const THEME_SETTINGS_INVALID_MESSAGE =
+  '检测到 settings JSON 配置文件损坏，Theme Console 已停止读取并禁止保存，请先修复对应文件后再重试';
 
 const LEGACY_INTRO_LEAD =
   '这是一个开源写作主题与示例内容库:包含 随笔/essay、小记/memo、归档/archive 与 絮语/bits，使用与配置请见 README 。';
@@ -296,6 +335,10 @@ const cloneThemeSettingsSources = (sources: ThemeSettingsSources): ThemeSettings
   page: { ...sources.page },
   ui: { ...sources.ui }
 });
+
+const cloneThemeSettingsReadDiagnostics = (
+  diagnostics: readonly ThemeSettingsReadDiagnostic[]
+): ThemeSettingsReadDiagnostic[] => diagnostics.map((diagnostic) => ({ ...diagnostic }));
 
 const DEFAULT_SITE: SiteSettings = {
   title: 'Whono',
@@ -396,6 +439,7 @@ const SIDEBAR_HREFS: Record<SidebarNavId, string> = {
 };
 
 let cachedSettings: ThemeSettingsResolved | null = null;
+const shouldCacheThemeSettings = import.meta.env.PROD;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -552,18 +596,120 @@ const resolveValue = <T>(
   return { value: defaultValue, source: 'default' };
 };
 
-const readSettingsObject = (name: 'site' | 'shell' | 'home' | 'page' | 'ui'): Record<string, unknown> | undefined => {
+const toReadErrorDetail = (error: unknown): string =>
+  error instanceof Error ? error.message.trim() : String(error).trim();
+
+const extractDiagnosticLocation = (
+  detail?: string
+): { line?: number; column?: number } => {
+  if (!detail) return {};
+
+  const match = detail.match(/\(line\s+(\d+)\s+column\s+(\d+)\)\s*$/i);
+  if (!match) return {};
+
+  const line = Number.parseInt(match[1] ?? '', 10);
+  const column = Number.parseInt(match[2] ?? '', 10);
+  const location: { line?: number; column?: number } = {};
+  if (Number.isFinite(line)) {
+    location.line = line;
+  }
+  if (Number.isFinite(column)) {
+    location.column = column;
+  }
+  return location;
+};
+
+const createThemeSettingsReadDiagnostic = (
+  group: ThemeSettingsFileGroup,
+  code: ThemeSettingsReadDiagnostic['code'],
+  detail?: string
+): ThemeSettingsReadDiagnostic => {
+  const path = SETTINGS_RELATIVE_PATHS[group];
+  const message =
+    code === 'invalid-json'
+      ? `${path} 不是合法 JSON`
+      : code === 'invalid-root'
+        ? `${path} 的根节点必须是 JSON 对象`
+        : `${path} 读取失败`;
+  const location = extractDiagnosticLocation(detail);
+
+  return {
+    group,
+    path,
+    code,
+    message,
+    ...(detail ? { detail } : {}),
+    ...location
+  };
+};
+
+const readSettingsObject = (
+  name: ThemeSettingsFileGroup,
+  diagnostics: ThemeSettingsReadDiagnostic[] = []
+): Record<string, unknown> | undefined => {
   const filePath = join(SETTINGS_DIR, `${name}.json`);
   if (!existsSync(filePath)) return undefined;
+
   try {
     const raw = readFileSync(filePath, 'utf8');
-    const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed)) return undefined;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      const diagnostic = createThemeSettingsReadDiagnostic(name, 'invalid-json', toReadErrorDetail(error));
+      console.warn(`[astro-whono] Failed to parse ${filePath}:`, error);
+      diagnostics.push(diagnostic);
+      return undefined;
+    }
+
+    if (!isRecord(parsed)) {
+      const diagnostic = createThemeSettingsReadDiagnostic(name, 'invalid-root');
+      console.warn(`[astro-whono] Invalid settings root for ${filePath}: expected JSON object`);
+      diagnostics.push(diagnostic);
+      return undefined;
+    }
+
     return parsed;
   } catch (error) {
+    const diagnostic = createThemeSettingsReadDiagnostic(name, 'read-failed', toReadErrorDetail(error));
     console.warn(`[astro-whono] Failed to read ${filePath}:`, error);
+    diagnostics.push(diagnostic);
     return undefined;
   }
+};
+
+export const getThemeSettingsReadDiagnostics = (): ThemeSettingsReadDiagnostic[] => {
+  const diagnostics: ThemeSettingsReadDiagnostic[] = [];
+  for (const name of SETTINGS_FILE_GROUPS) {
+    readSettingsObject(name, diagnostics);
+  }
+
+  return cloneThemeSettingsReadDiagnostics(diagnostics);
+};
+
+export const getThemeSettingsRevision = (): string => {
+  const hash = createHash('sha1');
+  for (const name of SETTINGS_FILE_GROUPS) {
+    const filePath = join(SETTINGS_DIR, `${name}.json`);
+    hash.update(name);
+    hash.update('\0');
+
+    if (!existsSync(filePath)) {
+      hash.update('__missing__');
+      hash.update('\0');
+      continue;
+    }
+
+    try {
+      hash.update(readFileSync(filePath));
+    } catch (error) {
+      hash.update(`__read_error__:${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    hash.update('\0');
+  }
+
+  return hash.digest('hex');
 };
 
 const parseSidebarNav = (value: unknown): SidebarNavItem[] | undefined => {
@@ -695,7 +841,7 @@ const buildResolvedSocialItems = (
 };
 
 export const getThemeSettings = (): ThemeSettingsResolved => {
-  if (cachedSettings) return cachedSettings;
+  if (shouldCacheThemeSettings && cachedSettings) return cachedSettings;
 
   const siteJson = readSettingsObject('site');
   const shellJson = readSettingsObject('shell');
@@ -1059,13 +1205,17 @@ export const getThemeSettings = (): ThemeSettingsResolved => {
     }
   };
 
-  cachedSettings = resolved;
+  // DEV 下关闭模块级缓存，避免手改 settings JSON 或切分支后继续读到旧值。
+  if (shouldCacheThemeSettings) {
+    cachedSettings = resolved;
+  }
   return resolved;
 };
 
 export const toEditableThemeSettingsPayload = (
   resolved: ThemeSettingsResolved
 ): ThemeSettingsEditablePayload => ({
+  revision: getThemeSettingsRevision(),
   settings: {
     site: {
       title: resolved.settings.site.title,
@@ -1115,6 +1265,24 @@ export const toEditableThemeSettingsPayload = (
 
 export const getEditableThemeSettingsPayload = (): ThemeSettingsEditablePayload =>
   toEditableThemeSettingsPayload(getThemeSettings());
+
+export const getEditableThemeSettingsState = (): ThemeSettingsEditableState => {
+  const diagnostics = getThemeSettingsReadDiagnostics();
+  if (diagnostics.length > 0) {
+    return {
+      ok: false,
+      mode: 'invalid-settings',
+      message: THEME_SETTINGS_INVALID_MESSAGE,
+      errors: diagnostics.map((diagnostic) => diagnostic.message),
+      diagnostics
+    };
+  }
+
+  return {
+    ok: true,
+    payload: getEditableThemeSettingsPayload()
+  };
+};
 
 export const resetThemeSettingsCache = (): void => {
   cachedSettings = null;
