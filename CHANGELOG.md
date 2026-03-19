@@ -24,6 +24,7 @@ The format is based on Keep a Changelog, and this project aims to follow Semanti
 - 修复无 JavaScript 时 `/archive/` 标签入口不可用的问题。
 - 修复标签结果页标签显示异常、列表多词搜索不准确，以及 `/bits/` 搜索与年份筛选结果不同步等问题。
 - 修复 Theme Console 的配置缓存、坏配置覆盖与重复 slug 可能引发的异常。
+- 修复 archive 异常标签可能生成错误路由与统计的问题；构建时会直接中止并提示。
 
 ### Maintenance
 - 调整 Theme Console 客户端脚本结构，便于后续维护与迭代。

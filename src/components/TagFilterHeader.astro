@@ -44,20 +44,45 @@ const tagTriggerText = currentTag ? '切换标签' : '#标签';
 
 <div class={headerClass}>
   <div class="page-heading">
-    <h1 class="page-title">{pageTitleText}</h1>
-    <span class="page-subtitle page-subtitle--entry-filters">
+    <div class="page-title-row">
+      <h1 class="page-title">{pageTitleText}</h1>
+      {currentTag ? (
+        <span class="entry-tag-current__pill entry-tag-current__pill--inline">
+          <Icon name="tag" class="entry-tag-current__icon" size={14} />
+          <strong class="entry-tag-current__label">#{currentTag.label}</strong>
+        </span>
+      ) : null}
+    </div>
+    <span class:list={['page-subtitle', 'page-subtitle--entry-filters', currentTag && 'page-subtitle--with-current-tag']}>
       {subtitleText ? <span class="page-subtitle__text">{subtitleText}</span> : null}
-      <a class="page-subtitle__link page-subtitle__item" href={rssHref}>RSS</a>
+      {!currentTag ? <a class="page-subtitle__link page-subtitle__item" href={rssHref}>RSS</a> : null}
       {hasTagEntry ? (
-        <a
-          class="page-subtitle__action page-subtitle__item"
-          href={pickerHref}
-          data-entry-tag-trigger
-          aria-haspopup="dialog"
-          aria-expanded="false"
-        >
-          {tagTriggerText}
-        </a>
+        currentTag ? (
+          <span class="page-subtitle__item page-subtitle__actions">
+            <a
+              class="page-subtitle__action"
+              href={pickerHref}
+              data-entry-tag-trigger
+              aria-haspopup="dialog"
+              aria-expanded="false"
+            >
+              {tagTriggerText}
+            </a>
+            <a class="page-subtitle__link" href={currentTag.clearHref}>
+              清除筛选
+            </a>
+          </span>
+        ) : (
+          <a
+            class="page-subtitle__action page-subtitle__item"
+            href={pickerHref}
+            data-entry-tag-trigger
+            aria-haspopup="dialog"
+            aria-expanded="false"
+          >
+            {tagTriggerText}
+          </a>
+        )
       ) : null}
     </span>
   </div>
@@ -71,32 +96,22 @@ const tagTriggerText = currentTag ? '切换标签' : '#标签';
           autocomplete="off"
           aria-label={searchAriaLabel}
         />
+        <p class="entry-search-feedback" data-entry-search-feedback hidden></p>
       </div>
+      <span class="entry-search-bridge" aria-hidden="true"></span>
       <button
         class="entry-search-toggle"
         data-entry-search-toggle
         type="button"
         aria-label={searchAriaLabel}
-        title="搜索"
         aria-expanded="false"
       >
         <Icon name="search" class="icon" />
       </button>
+      <p class="sr-only" data-entry-search-live role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
   </div>
 </div>
-
-{currentTag ? (
-  <div class="entry-tag-current">
-    <span class="entry-tag-current__pill">
-      <Icon name="tag" class="entry-tag-current__icon" size={14} />
-      <strong class="entry-tag-current__label">#{currentTag.label}</strong>
-    </span>
-    <a class="entry-tag-current__clear" href={currentTag.clearHref}>清除筛选</a>
-  </div>
-) : null}
-
-<div class="entry-status" data-entry-search-status role="status" aria-live="polite"></div>
 
 {hasTagEntry ? (
   <>

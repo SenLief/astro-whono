@@ -1,4 +1,5 @@
 type TagContainer = {
+  id?: string;
   data?: {
     tags?: string[] | null | undefined;
   } | null;
@@ -15,6 +16,7 @@ export type TagScope = 'archive';
 const SPACE_RE = /\s+/g;
 const TAG_KEY_RE = /[\s/\\?#%]+/g;
 const TRIM_DASH_RE = /^-+|-+$/g;
+const NON_ROUTABLE_TAG_KEY_RE = /[\s/\\?#%]/;
 const TAG_LABEL_COLLATOR = new Intl.Collator('zh-CN', {
   sensitivity: 'variant',
   numeric: true
@@ -33,6 +35,25 @@ export function toTagKey(label: string): string {
   return normalizeTagLabel(label).toLowerCase().replace(TAG_KEY_RE, '-').replace(TRIM_DASH_RE, '');
 }
 
+export function isRoutableTagKey(key: string): boolean {
+  return key.length > 0 && key !== '.' && key !== '..' && !NON_ROUTABLE_TAG_KEY_RE.test(key);
+}
+
+const assertRoutableTagKey = (entryId: string | undefined, label: string, key: string): void => {
+  if (isRoutableTagKey(key)) return;
+
+  throw new Error(
+    [
+      'Invalid archive tag key detected.',
+      `  Entry:       ${entryId ?? '(unknown entry)'}`,
+      `  Tag label:   ${JSON.stringify(label)}`,
+      `  Route key:   ${key ? JSON.stringify(key) : '(empty)'}`,
+      '  Reason:      archive tag keys must normalize to one routable segment and cannot be "." or "..".',
+      '  How to fix:  rename the tag so it does not collapse to an empty / reserved / non-routable route segment.'
+    ].join('\n')
+  );
+};
+
 export function getTagKeys(tags: readonly string[] | null | undefined): string[] {
   if (!Array.isArray(tags) || tags.length === 0) return [];
 
@@ -44,7 +65,7 @@ export function getTagKeys(tags: readonly string[] | null | undefined): string[]
     if (!normalized) continue;
 
     const key = toTagKey(normalized);
-    if (!key || seen.has(key)) continue;
+    if (!isRoutableTagKey(key) || seen.has(key)) continue;
 
     keys.push(key);
     seen.add(key);
@@ -65,6 +86,7 @@ export function collectTagSummary<T extends TagContainer>(entries: readonly T[])
       if (!label) continue;
 
       const key = toTagKey(label);
+      assertRoutableTagKey(entry.id, label, key);
       const entryLabel = entryLabels.get(key);
       entryLabels.set(key, entryLabel ? pickPreferredTagLabel(entryLabel, label) : label);
     }
@@ -92,23 +114,23 @@ export function collectTagSummary<T extends TagContainer>(entries: readonly T[])
 }
 
 export function hasTagKey(tags: readonly string[] | null | undefined, key: string): boolean {
-  if (!key) return false;
+  if (!isRoutableTagKey(key)) return false;
   return getTagKeys(tags).includes(key);
 }
 
 export function filterEntriesByTag<T extends TagContainer>(entries: readonly T[], key: string): T[] {
-  if (!key) return entries.slice();
+  if (!isRoutableTagKey(key)) return [];
   return entries.filter((entry) => hasTagKey(entry.data?.tags, key));
 }
 
 export function findTagSummary(tagSummaries: readonly TagSummary[], rawKey: string): TagSummary | null {
   const key = toTagKey(rawKey);
-  if (!key) return null;
+  if (!isRoutableTagKey(key)) return null;
   return tagSummaries.find((tagSummary) => tagSummary.key === key) ?? null;
 }
 
 export function getTagPath(scope: TagScope, rawKey: string, page = 1): string {
   const key = toTagKey(rawKey);
-  if (!key) return `/${scope}/`;
+  if (!isRoutableTagKey(key)) return `/${scope}/`;
   return page <= 1 ? `/${scope}/tag/${key}/` : `/${scope}/tag/${key}/page/${page}/`;
 }

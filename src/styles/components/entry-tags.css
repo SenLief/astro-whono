@@ -10,11 +10,25 @@
   gap: 0;
 }
 
+.page-title-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
 .page-subtitle__text,
 .page-subtitle__item {
   display: inline-flex;
   align-items: center;
   min-height: 1.4em;
+}
+
+.page-subtitle--with-current-tag::before {
+  content: "·";
+  margin: 0 0.55em 0 0;
+  color: var(--faint);
 }
 
 .page-subtitle__text:not(:last-child)::after,
@@ -31,23 +45,8 @@
   color: var(--accent);
 }
 
-.entry-tag-current {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 12px;
-  min-height: 26px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.essay-page .entry-tag-current {
-  padding-left: 14px;
-}
-
-.entry-tag-current[hidden] {
-  display: none;
+.page-subtitle__actions {
+  gap: 10px;
 }
 
 .entry-tag-current__pill {
@@ -58,6 +57,11 @@
   color: var(--text);
   font-size: 12px;
   line-height: 1;
+}
+
+.entry-tag-current__pill--inline {
+  min-height: 1.4em;
+  color: var(--muted);
 }
 
 .entry-tag-current__icon {
@@ -71,38 +75,6 @@
   letter-spacing: 0;
   line-height: 1.2;
   font-family: "LXGW WenKai Lite", "Kaiti SC", "STKaiti", serif;
-}
-
-.entry-tag-current__clear {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 24px;
-  padding: 0 8px;
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.1;
-  color: var(--muted);
-  text-decoration: none;
-  border-bottom: 0;
-  background: var(--code-content-bg);
-  box-shadow: inset 0 0 0 1px var(--border);
-  transition:
-    background-color 0.2s ease;
-}
-
-.entry-tag-current__clear:hover {
-  background: var(--panel);
-}
-
-.entry-tag-current__clear:focus-visible {
-  background: var(--panel);
-}
-
-.entry-tag-current__clear:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 8px;
 }
 
 .entry-tags-dialog {
@@ -417,10 +389,6 @@
 }
 
 @media (max-width: 900px) {
-  .essay-page .entry-tag-current {
-    padding-left: 0;
-  }
-
   .entry-tags-dialog {
     --entry-tags-dialog-top: clamp(84px, 11vh, 120px);
     width: min(720px, calc(100vw - 24px));
@@ -448,10 +416,6 @@
   .page-subtitle__text:not(:last-child)::after,
   .page-subtitle__item:not(:last-child)::after {
     margin: 0 0.5em;
-  }
-
-  .entry-tag-current {
-    gap: 10px;
   }
 
   .entry-tag-current__pill {
@@ -521,6 +485,12 @@
     min-width: 17px;
     height: 17px;
     font-size: 10px;
+  }
+}
+
+@media (max-width: 900px) {
+  .page-subtitle--with-current-tag::before {
+    content: none;
   }
 }
 

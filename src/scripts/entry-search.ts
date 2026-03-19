@@ -17,6 +17,8 @@ type PageItem = {
 
 const root = document.querySelector<HTMLElement>('[data-entry-filters]');
 const FILTER_DEBOUNCE_MS = 120;
+const HOVER_PREVIEW_CLOSE_DELAY_MS = 48;
+const HOVER_PREVIEW_MEDIA_QUERY = '(hover: hover) and (pointer: fine)';
 const getQueryTerms = (query: string) =>
   Array.from(new Set(query.split(/\s+/).map((term) => term.trim().toLowerCase()).filter(Boolean)));
 
@@ -27,7 +29,8 @@ if (!root) {
   const input = searchRoot?.querySelector<HTMLInputElement>('[data-entry-search-input]') ?? null;
   const toggleBtn = searchRoot?.querySelector<HTMLButtonElement>('[data-entry-search-toggle]') ?? null;
   const panel = searchRoot?.querySelector<HTMLElement>('[data-entry-search-panel]') ?? null;
-  const statusEl = root.querySelector<HTMLDivElement>('[data-entry-search-status]');
+  const feedbackEl = searchRoot?.querySelector<HTMLParagraphElement>('[data-entry-search-feedback]') ?? null;
+  const liveEl = searchRoot?.querySelector<HTMLParagraphElement>('[data-entry-search-live]') ?? null;
   const tagTrigger = root.querySelector<HTMLAnchorElement>('[data-entry-tag-trigger]');
   const tagDialog = root.querySelector<HTMLDialogElement>('[data-entry-tag-dialog]');
   const tagCloseBtn = root.querySelector<HTMLButtonElement>('[data-entry-tag-close]');
@@ -57,10 +60,31 @@ if (!root) {
       .filter(Boolean)
   );
 
-  const setStatus = (text: string) => {
-    if (!statusEl) return;
-    if (statusEl.textContent === text) return;
-    statusEl.textContent = text;
+  const setFeedbackStatus = (text: string) => {
+    if (!feedbackEl) return;
+    const next = text.trim();
+    const nextHidden = next === '';
+    if (feedbackEl.textContent === next && feedbackEl.hidden === nextHidden) return;
+    feedbackEl.textContent = next;
+    feedbackEl.hidden = nextHidden;
+  };
+
+  const setLiveStatus = (text: string) => {
+    if (!liveEl) return;
+    if (liveEl.textContent === text) return;
+    liveEl.textContent = text;
+  };
+
+  const setStatus = (
+    text: string,
+    options: {
+      announce?: boolean;
+      visible?: boolean;
+    } = {}
+  ) => {
+    const { announce = true, visible = true } = options;
+    setFeedbackStatus(visible ? text : '');
+    setLiveStatus(announce ? text : '');
   };
 
   const setItemVisible = (item: PageItem, visible: boolean) => {
@@ -131,8 +155,12 @@ if (!root) {
   let indexFailed = false;
   let filterTimer: number | null = null;
   let filterRunId = 0;
+  let hoverCloseTimer: number | null = null;
+  let hoverPreviewActive = false;
+  const hoverPreviewMedia = window.matchMedia(HOVER_PREVIEW_MEDIA_QUERY);
 
   const isSearchOpen = () => searchRoot?.classList.contains('is-open') ?? false;
+  const supportsHoverPreview = () => hoverPreviewMedia.matches;
 
   const setSearchOpen = (open: boolean) => {
     if (!searchRoot) return;
@@ -140,6 +168,55 @@ if (!root) {
     toggleBtn?.setAttribute('aria-expanded', open ? 'true' : 'false');
     panel?.setAttribute('aria-hidden', open ? 'false' : 'true');
     if (input) input.tabIndex = open ? 0 : -1;
+  };
+
+  const clearHoverCloseTimer = () => {
+    if (hoverCloseTimer === null) return;
+    window.clearTimeout(hoverCloseTimer);
+    hoverCloseTimer = null;
+  };
+
+  const hasSearchValue = () => Boolean(input?.value.trim());
+
+  const isInputFocused = () => document.activeElement === input;
+
+  const closeSearch = (options: { reset?: boolean } = {}) => {
+    clearHoverCloseTimer();
+    hoverPreviewActive = false;
+    if (options.reset) {
+      resetSearch();
+    }
+    setSearchOpen(false);
+  };
+
+  const openSearchInteractive = (options: { focusInput?: boolean; preloadIndex?: boolean } = {}) => {
+    clearHoverCloseTimer();
+    hoverPreviewActive = false;
+    setSearchOpen(true);
+    if (options.focusInput) {
+      window.setTimeout(() => input?.focus(), 0);
+    }
+    if (options.preloadIndex) {
+      void loadIndex();
+    }
+  };
+
+  const openSearchHoverPreview = () => {
+    if (!supportsHoverPreview() || indexFailed) return;
+    clearHoverCloseTimer();
+    if (isSearchOpen() && !hoverPreviewActive) return;
+    hoverPreviewActive = true;
+    setSearchOpen(true);
+  };
+
+  const scheduleHoverPreviewClose = () => {
+    if (!supportsHoverPreview() || !hoverPreviewActive) return;
+    clearHoverCloseTimer();
+    hoverCloseTimer = window.setTimeout(() => {
+      hoverCloseTimer = null;
+      if (!hoverPreviewActive || hasSearchValue() || isInputFocused()) return;
+      closeSearch();
+    }, HOVER_PREVIEW_CLOSE_DELAY_MS);
   };
 
   const getStatusPrefix = (query: string, totalMatches: number) => {
@@ -194,6 +271,7 @@ if (!root) {
       toggleBtn.disabled = true;
       toggleBtn.setAttribute('aria-disabled', 'true');
     }
+    setSearchOpen(true);
     showAllItems();
     syncSections(false);
     setStatus('索引加载失败，已禁用搜索');
@@ -205,7 +283,7 @@ if (!root) {
     if (indexFailed) return null;
 
     if (!indexPromise) {
-      setStatus('正在加载索引...');
+      setStatus('正在加载索引...', { visible: false });
       indexPromise = fetch(indexUrl)
         .then((response) => {
           if (!response.ok) throw new Error('index fetch failed');
@@ -283,6 +361,16 @@ if (!root) {
     window.history.replaceState({}, '', next);
   };
 
+  const setTagDialogExpanded = (expanded: boolean) => {
+    tagTrigger?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  };
+
+  const finalizeTagDialogClose = () => {
+    if (tagDialog?.open) return;
+    setTagDialogExpanded(false);
+    removePickerParam();
+  };
+
   const openTagDialog = (options: { focusTitle?: boolean } = {}) => {
     if (!tagDialog || tagDialog.open) return;
     if (typeof tagDialog.showModal === 'function') {
@@ -292,7 +380,7 @@ if (!root) {
           tagDialogTitle.focus({ preventScroll: true });
         });
       }
-      tagTrigger?.setAttribute('aria-expanded', 'true');
+      setTagDialogExpanded(true);
       return;
     }
     tagDialog.setAttribute('open', '');
@@ -301,18 +389,17 @@ if (!root) {
         tagDialogTitle.focus({ preventScroll: true });
       });
     }
-    tagTrigger?.setAttribute('aria-expanded', 'true');
+    setTagDialogExpanded(true);
   };
 
   const closeTagDialog = () => {
     if (!tagDialog) return;
     if (typeof tagDialog.close === 'function') {
       tagDialog.close();
-      tagTrigger?.setAttribute('aria-expanded', 'false');
       return;
     }
     tagDialog.removeAttribute('open');
-    tagTrigger?.setAttribute('aria-expanded', 'false');
+    finalizeTagDialogClose();
   };
 
   const resetSearch = () => {
@@ -324,23 +411,23 @@ if (!root) {
 
   syncLegacyTagParam();
   setSearchOpen(false);
-  tagTrigger?.setAttribute('aria-expanded', 'false');
+  setTagDialogExpanded(false);
 
   toggleBtn?.addEventListener('click', () => {
-    const next = !isSearchOpen();
-    if (next) {
-      setSearchOpen(true);
-      window.setTimeout(() => input?.focus(), 0);
-      void loadIndex();
+    if (hoverPreviewActive) {
+      openSearchInteractive({ focusInput: true, preloadIndex: true });
       return;
     }
-    resetSearch();
-    setSearchOpen(false);
+    const next = !isSearchOpen();
+    if (next) {
+      openSearchInteractive({ focusInput: true, preloadIndex: true });
+      return;
+    }
+    closeSearch({ reset: true });
   });
 
   input?.addEventListener('focus', () => {
-    setSearchOpen(true);
-    void loadIndex();
+    openSearchInteractive({ preloadIndex: true });
   });
 
   input?.addEventListener('input', () => {
@@ -349,8 +436,7 @@ if (!root) {
 
   input?.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
-      resetSearch();
-      setSearchOpen(false);
+      closeSearch({ reset: true });
       return;
     }
     if (event.key === 'Enter') {
@@ -359,13 +445,27 @@ if (!root) {
     }
   });
 
+  const handleHoverPreviewEnter = () => {
+    openSearchHoverPreview();
+  };
+
+  const handleHoverPreviewLeave = (event: PointerEvent) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (nextTarget && searchRoot?.contains(nextTarget)) return;
+    scheduleHoverPreviewClose();
+  };
+
+  searchRoot?.addEventListener('pointerenter', handleHoverPreviewEnter);
+  searchRoot?.addEventListener('pointerleave', handleHoverPreviewLeave);
+
   document.addEventListener('click', (event) => {
     const target = event.target as Node | null;
     if (!target) return;
     if (!isSearchOpen()) return;
+    if (indexFailed) return;
     if (searchRoot?.contains(target)) return;
-    if (input?.value.trim()) return;
-    setSearchOpen(false);
+    if (hasSearchValue()) return;
+    closeSearch();
   });
 
   tagTrigger?.addEventListener('click', (event) => {
@@ -378,11 +478,13 @@ if (!root) {
   });
 
   tagDialog?.addEventListener('cancel', () => {
-    removePickerParam();
+    window.requestAnimationFrame(() => {
+      finalizeTagDialogClose();
+    });
   });
 
   tagDialog?.addEventListener('close', () => {
-    removePickerParam();
+    finalizeTagDialogClose();
   });
 
   tagDialog?.addEventListener('click', (event) => {
