@@ -31,6 +31,7 @@ const imageItems = images.map((image) => ({
   src: withBase(image.src)
 }));
 const maxVisible = 4;
+const visibleImages = imageItems.slice(0, maxVisible);
 const firstImage = imageItems.length === 1 ? imageItems[0] : null;
 const totalImages = imageItems.length;
 const wideIndex = totalImages > 1 && totalImages <= maxVisible && totalImages % 2 === 1 ? 0 : -1;
@@ -89,17 +90,11 @@ const hasTags = Boolean(placeText || normalTagItems.length);
           loading="lazy"
         />
       </button>
-      <script
-        type="application/json"
-        data-bit-images
-        is:inline
-        set:html={JSON.stringify(imageItems)}
-      ></script>
     </div>
   ) : imageItems.length > 1 ? (
     <div class="bit-media bit-media--grid">
       <div class="bit-media-grid">
-        {imageItems.slice(0, maxVisible).map((image, index) => {
+        {visibleImages.map((image, index) => {
           const isMore = index === maxVisible - 1 && imageItems.length > maxVisible;
           return (
             <button
@@ -128,12 +123,20 @@ const hasTags = Boolean(placeText || normalTagItems.length);
           );
         })}
       </div>
-      <script
-        type="application/json"
-        data-bit-images
-        is:inline
-        set:html={JSON.stringify(imageItems)}
-      ></script>
+    </div>
+  ) : null}
+
+  {imageItems.length ? (
+    <div hidden aria-hidden="true">
+      {imageItems.map((image) => (
+        <span
+          data-bit-image-item
+          data-bit-image-src={image.src}
+          data-bit-image-alt={image.alt ?? ''}
+          data-bit-image-width={image.width}
+          data-bit-image-height={image.height}
+        ></span>
+      ))}
     </div>
   ) : null}
 

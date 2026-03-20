@@ -506,28 +506,35 @@ export const initBitsLightbox = (options: LightboxOptions = {}) => {
   if (!controller) return;
 
   const imagesCache = new WeakMap<HTMLElement, LightboxImage[]>();
+  const parsePositiveDimension = (value: string | undefined) => {
+    const parsed = Number(value ?? '');
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  };
+  const toBitLightboxImage = (node: HTMLElement): LightboxImage | null => {
+    const safeSrc = toSafeDocumentImageUrl(node.dataset.bitImageSrc ?? '');
+    if (!safeSrc) return null;
+    const alt = node.dataset.bitImageAlt ?? '';
+    const width = parsePositiveDimension(node.dataset.bitImageWidth);
+    const height = parsePositiveDimension(node.dataset.bitImageHeight);
+    return {
+      src: safeSrc,
+      ...(alt ? { alt } : {}),
+      ...(width ? { width } : {}),
+      ...(height ? { height } : {})
+    };
+  };
 
   const parseImages = (card: HTMLElement) => {
     const cached = imagesCache.get(card);
     if (cached) return cached;
-    const script = card.querySelector<HTMLScriptElement>('script[data-bit-images]');
-    if (!script?.textContent) return null;
-    try {
-      const parsed = JSON.parse(script.textContent) as LightboxImage[];
-      if (!Array.isArray(parsed)) return null;
-      const sanitized = parsed
-        .filter((item): item is LightboxImage => !!item && typeof item.src === 'string')
-        .map((item) => {
-          const safeSrc = toSafeDocumentImageUrl(item.src);
-          return safeSrc ? { ...item, src: safeSrc } : null;
-        })
-        .filter((item): item is LightboxImage => item !== null);
-      if (sanitized.length === 0) return null;
-      imagesCache.set(card, sanitized);
-      return sanitized;
-    } catch {
-      return null;
-    }
+    const imageNodes = Array.from(card.querySelectorAll<HTMLElement>('[data-bit-image-item]'));
+    if (imageNodes.length === 0) return null;
+    const sanitized = imageNodes
+      .map(toBitLightboxImage)
+      .filter((item): item is LightboxImage => item !== null);
+    if (sanitized.length === 0) return null;
+    imagesCache.set(card, sanitized);
+    return sanitized;
   };
 
   const handleOpen = (button: HTMLButtonElement, index: number) => {
