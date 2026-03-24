@@ -1,94 +1,138 @@
 ---
-import { getEntry } from 'astro:content';
-import AdminHomeSection from '../../components/admin/AdminHomeSection.astro';
-import AdminPageSection from '../../components/admin/AdminPageSection.astro';
-import AdminSidebarSection from '../../components/admin/AdminSidebarSection.astro';
-import AdminSiteSection from '../../components/admin/AdminSiteSection.astro';
-import AdminUiSection from '../../components/admin/AdminUiSection.astro';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { getEditableThemeSettingsState, type SidebarNavId } from '../../lib/theme-settings';
-import '../../styles/components/admin.css';
-import {
-  ADMIN_FOOTER_START_YEAR_MIN,
-  ADMIN_HOME_INTRO_MAX_LENGTH,
-  ADMIN_NAV_IDS,
-  ADMIN_NAV_ORNAMENT_DEFAULT,
-  ADMIN_PAGE_TITLE_MAX_LENGTH,
-  ADMIN_PAGE_SUBTITLE_MAX_LENGTH,
-  ADMIN_SOCIAL_CUSTOM_LIMIT,
-  getAdminFooterStartYearMax
-} from '../../lib/admin-console/shared';
 import { createWithBase } from '../../utils/format';
 
 const isDev = import.meta.env.DEV;
 const base = import.meta.env.BASE_URL ?? '/';
 const withBase = createWithBase(base);
-const settingsEndpoint = withBase('/api/admin/settings/');
 
-const navIdOrder: readonly SidebarNavId[] = ADMIN_NAV_IDS;
-const navLabelFallback: Record<SidebarNavId, string> = {
-  essay: '随笔',
-  bits: '絮语',
-  memo: '小记',
-  archive: '归档',
-  about: '关于'
+const loadAdminDevState = async () => {
+  const [
+    { getEntry },
+    { getEditableThemeSettingsState },
+    {
+      ADMIN_FOOTER_START_YEAR_MIN,
+      ADMIN_HOME_INTRO_MAX_LENGTH,
+      ADMIN_NAV_IDS,
+      ADMIN_NAV_ORNAMENT_DEFAULT,
+      ADMIN_PAGE_TITLE_MAX_LENGTH,
+      ADMIN_PAGE_SUBTITLE_MAX_LENGTH,
+      ADMIN_SOCIAL_CUSTOM_LIMIT,
+      getAdminFooterStartYearMax
+    },
+    { default: AdminHomeSection },
+    { default: AdminPageSection },
+    { default: AdminSidebarSection },
+    { default: AdminSiteSection },
+    { default: AdminUiSection },
+    { default: adminConsoleScriptHref },
+    { default: adminStylesHref }
+  ] = await Promise.all([
+    import('astro:content'),
+    import('../../lib/theme-settings'),
+    import('../../lib/admin-console/shared'),
+    import('../../components/admin/AdminHomeSection.astro'),
+    import('../../components/admin/AdminPageSection.astro'),
+    import('../../components/admin/AdminSidebarSection.astro'),
+    import('../../components/admin/AdminSiteSection.astro'),
+    import('../../components/admin/AdminUiSection.astro'),
+    import('../../scripts/admin-console/index.ts?url'),
+    import('../../styles/components/admin.css?url')
+  ]);
+
+  const settingsEndpoint = withBase('/api/admin/settings/');
+  const navIdOrder = ADMIN_NAV_IDS;
+  const navLabelFallback = {
+    essay: '随笔',
+    bits: '絮语',
+    memo: '小记',
+    archive: '归档',
+    about: '关于'
+  } as const;
+  const homeIntroMaxLength = ADMIN_HOME_INTRO_MAX_LENGTH;
+  const pageTitleMaxLength = ADMIN_PAGE_TITLE_MAX_LENGTH;
+  const pageSubtitleMaxLength = ADMIN_PAGE_SUBTITLE_MAX_LENGTH;
+  const footerStartYearMin = ADMIN_FOOTER_START_YEAR_MIN;
+  const footerStartYearMax = getAdminFooterStartYearMax();
+  const socialCustomLimit = ADMIN_SOCIAL_CUSTOM_LIMIT;
+  const memoEntry = await getEntry('memo', 'index');
+  const memoTitlePlaceholder = typeof memoEntry?.data.title === 'string' ? memoEntry.data.title.trim() : '';
+  const memoSubtitlePlaceholder =
+    typeof memoEntry?.data.subtitle === 'string' ? memoEntry.data.subtitle.trim() : '';
+
+  const initialState = getEditableThemeSettingsState();
+  const bootstrapState = initialState.ok
+    ? (() => {
+        const initialNavMap = new Map(
+          initialState.payload.settings.shell.nav.map((item) => [item.id, item])
+        );
+
+        return {
+          ok: true as const,
+          payload: {
+            revision: initialState.payload.revision,
+            settings: {
+              ...initialState.payload.settings,
+              shell: {
+                ...initialState.payload.settings.shell,
+                nav: navIdOrder.map((id, index) => {
+                  const current = initialNavMap.get(id);
+                  if (current) return current;
+                  return {
+                    id,
+                    label: navLabelFallback[id],
+                    ornament: ADMIN_NAV_ORNAMENT_DEFAULT,
+                    visible: true,
+                    order: index + 1
+                  };
+                })
+              }
+            },
+            sources: initialState.payload.sources
+          }
+        };
+      })()
+    : initialState;
+
+  return {
+    AdminHomeSection,
+    AdminPageSection,
+    AdminSidebarSection,
+    AdminSiteSection,
+    AdminUiSection,
+    adminConsoleScriptHref,
+    adminStylesHref,
+    settingsEndpoint,
+    homeIntroMaxLength,
+    pageTitleMaxLength,
+    pageSubtitleMaxLength,
+    footerStartYearMin,
+    footerStartYearMax,
+    socialCustomLimit,
+    memoTitlePlaceholder,
+    memoSubtitlePlaceholder,
+    bootstrapText: JSON.stringify(bootstrapState),
+    navIdOrder
+  };
 };
-const homeIntroMaxLength = ADMIN_HOME_INTRO_MAX_LENGTH;
-const pageTitleMaxLength = ADMIN_PAGE_TITLE_MAX_LENGTH;
-const pageSubtitleMaxLength = ADMIN_PAGE_SUBTITLE_MAX_LENGTH;
-const footerStartYearMin = ADMIN_FOOTER_START_YEAR_MIN;
-const footerStartYearMax = getAdminFooterStartYearMax();
-const socialCustomLimit = ADMIN_SOCIAL_CUSTOM_LIMIT;
-const memoEntry = await getEntry('memo', 'index');
-const memoTitlePlaceholder = typeof memoEntry?.data.title === 'string' ? memoEntry.data.title.trim() : '';
-const memoSubtitlePlaceholder =
-  typeof memoEntry?.data.subtitle === 'string' ? memoEntry.data.subtitle.trim() : '';
 
-const initialState = getEditableThemeSettingsState();
-const bootstrapState = initialState.ok
-  ? (() => {
-      const initialNavMap = new Map(
-        initialState.payload.settings.shell.nav.map((item) => [item.id, item])
-      );
-
-      return {
-        ok: true as const,
-        payload: {
-          revision: initialState.payload.revision,
-          settings: {
-            ...initialState.payload.settings,
-            shell: {
-              ...initialState.payload.settings.shell,
-              nav: navIdOrder.map((id, index) => {
-                const current = initialNavMap.get(id);
-                if (current) return current;
-                return {
-                  id,
-                  label: navLabelFallback[id],
-                  ornament: ADMIN_NAV_ORNAMENT_DEFAULT,
-                  visible: true,
-                  order: index + 1
-                };
-              })
-            }
-          },
-          sources: initialState.payload.sources
-        }
-      };
-    })()
-  : initialState;
-
-const bootstrapJson = JSON.stringify(bootstrapState).replace(/</g, '\u003c');
+const adminDevState = isDev ? await loadAdminDevState() : null;
+const AdminHomeSection = adminDevState?.AdminHomeSection;
+const AdminPageSection = adminDevState?.AdminPageSection;
+const AdminSidebarSection = adminDevState?.AdminSidebarSection;
+const AdminSiteSection = adminDevState?.AdminSiteSection;
+const AdminUiSection = adminDevState?.AdminUiSection;
 ---
 
 <BaseLayout title="Theme Console" bodyClass="admin-page">
   <Fragment slot="head">
     <meta name="robots" content="noindex,nofollow" />
+    {isDev && adminDevState?.adminStylesHref ? <link rel="stylesheet" href={adminDevState.adminStylesHref} /> : null}
   </Fragment>
 
   {
-    isDev ? (
-      <section class="admin-console" data-admin-root data-settings-endpoint={settingsEndpoint}>
+    isDev && adminDevState && AdminHomeSection && AdminPageSection && AdminSidebarSection && AdminSiteSection && AdminUiSection ? (
+      <section class="admin-console" data-admin-root data-settings-endpoint={adminDevState.settingsEndpoint}>
         <header class="page-header page-header--admin">
           <div class="admin-heading">
             <h1 class="page-title">Theme Console</h1>
@@ -128,20 +172,20 @@ const bootstrapJson = JSON.stringify(bootstrapState).replace(/</g, '\u003c');
 
         <form id="admin-form" class="admin-form" novalidate>
           <AdminSiteSection
-            footerStartYearMin={footerStartYearMin}
-            footerStartYearMax={footerStartYearMax}
-            socialCustomLimit={socialCustomLimit}
+            footerStartYearMin={adminDevState.footerStartYearMin}
+            footerStartYearMax={adminDevState.footerStartYearMax}
+            socialCustomLimit={adminDevState.socialCustomLimit}
           />
 
-          <AdminSidebarSection navIdOrder={navIdOrder} />
+          <AdminSidebarSection navIdOrder={adminDevState.navIdOrder} />
 
-          <AdminHomeSection homeIntroMaxLength={homeIntroMaxLength} />
+          <AdminHomeSection homeIntroMaxLength={adminDevState.homeIntroMaxLength} />
 
           <AdminPageSection
-            pageTitleMaxLength={pageTitleMaxLength}
-            pageSubtitleMaxLength={pageSubtitleMaxLength}
-            memoTitlePlaceholder={memoTitlePlaceholder}
-            memoSubtitlePlaceholder={memoSubtitlePlaceholder}
+            pageTitleMaxLength={adminDevState.pageTitleMaxLength}
+            pageSubtitleMaxLength={adminDevState.pageSubtitleMaxLength}
+            memoTitlePlaceholder={adminDevState.memoTitlePlaceholder}
+            memoSubtitlePlaceholder={adminDevState.memoSubtitlePlaceholder}
           />
 
           <AdminUiSection />
@@ -164,7 +208,7 @@ const bootstrapJson = JSON.stringify(bootstrapState).replace(/</g, '\u003c');
           </div>
         </div>
 
-        <script id="admin-bootstrap" type="application/json" is:inline set:html={bootstrapJson}></script>
+        <div id="admin-bootstrap" hidden>{adminDevState.bootstrapText}</div>
       </section>
     ) : (
       <section class="admin-console admin-console--readonly">
@@ -182,10 +226,8 @@ const bootstrapJson = JSON.stringify(bootstrapState).replace(/</g, '\u003c');
   }
 
   {
-    isDev ? (
-      <script>
-        import '../../scripts/admin-console/index.ts';
-      </script>
+    isDev && adminDevState?.adminConsoleScriptHref ? (
+      <script is:inline type="module" src={adminDevState.adminConsoleScriptHref}></script>
     ) : null
   }
 </BaseLayout>

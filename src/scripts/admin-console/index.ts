@@ -65,7 +65,7 @@ if (!root) {
     validateBtn: byId<HTMLButtonElement>('admin-validate'),
     resetBtn: byId<HTMLButtonElement>('admin-reset'),
     saveBtn: byId<HTMLButtonElement>('admin-save'),
-    bootstrapEl: byId<HTMLScriptElement>('admin-bootstrap'),
+    bootstrapEl: byId<HTMLElement>('admin-bootstrap'),
     articleMetaPreviewValueEl: byId<HTMLElement>('article-meta-preview-value'),
     footerPreviewValueEl: byId<HTMLElement>('site-footer-preview-value'),
     socialCustomList: byId<HTMLElement>('site-social-custom-list'),
@@ -609,6 +609,7 @@ if (!root) {
       const fileName = diagnostic.path.split('/').pop() || diagnostic.path;
       if (diagnostic.code === 'invalid-json') return `${fileName} 格式错误`;
       if (diagnostic.code === 'invalid-root') return `${fileName} 结构错误`;
+      if (diagnostic.code === 'schema-mismatch') return `${fileName} 配置不一致`;
       return `${fileName} 读取失败`;
     };
 

@@ -6,7 +6,8 @@ import { getThemeSettings } from '../lib/theme-settings';
 const {
   bit,
   excerpt = '',
-  Content = null
+  Content = null,
+  prioritizeLeadMedia = false
 } = Astro.props;
 
 const bitEntry = bit as BitsEntry;
@@ -36,6 +37,8 @@ const firstImage = imageItems.length === 1 ? imageItems[0] : null;
 const totalImages = imageItems.length;
 const wideIndex = totalImages > 1 && totalImages <= maxVisible && totalImages % 2 === 1 ? 0 : -1;
 const hasTags = Boolean(placeText || normalTagItems.length);
+const getImageLoading = (prioritize: boolean) => (prioritize ? 'eager' : 'lazy');
+const getImageFetchPriority = (prioritize: boolean) => (prioritize ? 'high' : undefined);
 ---
 
 <article
@@ -87,7 +90,8 @@ const hasTags = Boolean(placeText || normalTagItems.length);
           alt={firstImage.alt ?? ''}
           width={firstImage.width}
           height={firstImage.height}
-          loading="lazy"
+          loading={getImageLoading(prioritizeLeadMedia)}
+          fetchpriority={getImageFetchPriority(prioritizeLeadMedia)}
         />
       </button>
     </div>
@@ -109,7 +113,8 @@ const hasTags = Boolean(placeText || normalTagItems.length);
                 alt={image.alt ?? ''}
                 width={image.width}
                 height={image.height}
-                loading="lazy"
+                loading={getImageLoading(prioritizeLeadMedia && index === 0)}
+                fetchpriority={getImageFetchPriority(prioritizeLeadMedia && index === 0)}
               />
               {isMore ? (
                 <>

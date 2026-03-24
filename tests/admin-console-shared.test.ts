@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canonicalizeAdminThemeSettings,
+  createAdminThemeSettingsCanonicalMismatchIssues,
   getAdminNavOrderIssues,
   getAdminSocialOrderIssues,
   normalizeAdminBitsAvatarPath,
-  normalizeAdminHeroImageSrc
+  normalizeAdminHeroImageSrc,
+  validateAdminThemeSettings
 } from '../src/lib/admin-console/shared';
+import { getEditableThemeSettingsPayload } from '../src/lib/theme-settings';
 
 describe('admin-console/shared', () => {
   it('reports duplicate and range issues for social orders', () => {
@@ -51,5 +55,53 @@ describe('admin-console/shared', () => {
     expect(normalizeAdminBitsAvatarPath('public/author/avatar.webp')).toBeUndefined();
     expect(normalizeAdminBitsAvatarPath('https://example.com/avatar.webp')).toBeUndefined();
     expect(normalizeAdminBitsAvatarPath('author/avatar.webp?v=2')).toBeUndefined();
+  });
+
+  it('canonicalizes admin settings snapshots and reports contract mismatches', () => {
+    const raw = structuredClone(getEditableThemeSettingsPayload().settings) as Record<string, any>;
+    raw.site.title = `  ${raw.site.title}  `;
+    raw.site.footer.startYear = String(raw.site.footer.startYear);
+    raw.site.socialLinks.email = `mailto:${raw.site.socialLinks.email}`;
+    raw.site.socialLinks.custom = [
+      {
+        id: 'custom-home',
+        label: '',
+        href: 'https://example.com',
+        iconKey: 'globe',
+        visible: 1,
+        order: '4'
+      }
+    ];
+    delete raw.page.about.subtitle;
+
+    const canonical = canonicalizeAdminThemeSettings(raw, {
+      footerStartYearMax: 2030,
+      normalizeCustomSocialLabel: (value, iconKey) => String(value ?? '').trim() || iconKey
+    });
+
+    expect(canonical.site.title).toBe(getEditableThemeSettingsPayload().settings.site.title);
+    expect(canonical.site.footer.startYear).toBe(getEditableThemeSettingsPayload().settings.site.footer.startYear);
+    expect(canonical.site.socialLinks.email).toBe(getEditableThemeSettingsPayload().settings.site.socialLinks.email);
+    expect(canonical.site.socialLinks.custom[0]).toMatchObject({
+      iconKey: 'website',
+      label: 'website',
+      visible: true,
+      order: 4
+    });
+    expect(validateAdminThemeSettings(canonical, { footerStartYearMax: 2030 })).toEqual([]);
+    expect(
+      createAdminThemeSettingsCanonicalMismatchIssues(raw, canonical).map((issue) => issue.path)
+    ).toEqual(
+      expect.arrayContaining([
+        'site.title',
+        'site.footer.startYear',
+        'site.socialLinks.email',
+        'site.socialLinks.custom[0].iconKey',
+        'site.socialLinks.custom[0].label',
+        'site.socialLinks.custom[0].visible',
+        'site.socialLinks.custom[0].order',
+        'page.about.subtitle'
+      ])
+    );
   });
 });

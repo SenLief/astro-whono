@@ -60,13 +60,10 @@ npm run build && npm run preview
 
 ### 常用命令
 
-- `npm run check`
-- `npm test`
-- `npm run ci:core`
-- `npm run ci`
-- `npm run audit:prod`
-- `npm run new:bit`
-- `npm run font:build`
+  - npm run dev
+  - npm run build
+  - npm run ci
+  - npm run new:bit
 
 <details>
   <summary>检查与回归命令说明</summary>
@@ -74,19 +71,21 @@ npm run build && npm run preview
 推荐按场景选择：
 
 ```bash
-# 日常回归
-npm run check
-npm test
-npm run build
-npm run ci:core
-
-# 提交前最终验证
+# 默认回归（GitHub Actions ）
 npm run ci
+
+# 发布前手动复核绝对链接 / sitemap / RSS（需已确定正式域名）
+SITE_URL=https://你的域名 npm run build
+SITE_URL=https://你的域名 npm run check:prod-artifacts
+
+# 仅在改动 Theme Console 或 /admin 边界时
+npm run check:preview-admin
 ```
 
 - `npm test` 主要覆盖标签工具、Theme Console 共享校验规则，以及主题设置 `revision` 的关键纯逻辑回归。
-- `npm run ci:core` 用于本地快速回归。
-- `npm run ci` 用于完整校验，与 GitHub Actions 保持一致。
+  - npm run ci 是默认回归入口；npm run ci:core 仅用于更快的本地增量回归。
+  - 未设置 SITE_URL 时，npm run build 仍可构建，但 SEO 相关输出会不完整。
+  - 发布前如需核对绝对链接产物，设置真实 SITE_URL 后运行 npm run check:prod-artifacts。
 </details>
 
 

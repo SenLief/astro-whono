@@ -60,13 +60,10 @@ If execution policy blocks `npm.ps1`, use one of the following:
 
 ### Common Commands
 
-- `npm run check`
-- `npm test`
-- `npm run ci:core`
-- `npm run ci`
-- `npm run audit:prod`
-- `npm run new:bit`
-- `npm run font:build`
+  - npm run dev
+  - npm run build
+  - npm run ci
+  - npm run new:bit
 
 <details>
   <summary>Check and regression commands</summary>
@@ -74,19 +71,21 @@ If execution policy blocks `npm.ps1`, use one of the following:
 Use them depending on the situation:
 
 ```bash
-# Day-to-day regression
-npm run check
-npm test
-npm run build
-npm run ci:core
-
-# Final verification before commit
+# Default regression entry (GitHub Actions)
 npm run ci
+
+# Manual release verification for absolute links / sitemap / RSS
+SITE_URL=https://your-domain npm run build
+SITE_URL=https://your-domain npm run check:prod-artifacts
+
+# Only when changing Theme Console or /admin boundaries
+npm run check:preview-admin
 ```
 
 - `npm test` mainly covers tag utilities, shared Theme Console validation rules, and core pure-logic regressions around theme settings `revision`.
-- `npm run ci:core` is the fast local regression entry.
-- `npm run ci` is the full verification entry and matches GitHub Actions.
+- `npm run ci` is the default regression entry; `npm run ci:core` is only for faster local incremental checks.
+- `npm run build` still works without `SITE_URL`, but SEO-related outputs will be incomplete.
+- Before release, if you need to verify absolute-link artifacts, set a real `SITE_URL` and run `npm run check:prod-artifacts`.
 </details>
 
 

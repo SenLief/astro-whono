@@ -10,11 +10,15 @@ The format is based on Keep a Changelog, and this project aims to follow Semanti
 ### Changed
 - 升级 Astro 到 v6，并同步更新相关官方包，延续现有主题、内容集合与构建流程。
 - 明确 Theme Console 的生产环境边界：`/admin/` 保留只读提示，`/api/admin/settings/` 仅供本地开发使用。
-- 调整验证命令：`npm run ci` 现在用于完整校验，新增 `npm run ci:core` 作为快速回归入口。
+- 优化代码块交互脚本的加载范围：正文页与小记页按需加载复制与行号逻辑，非正文页不再加载相关脚本。
 
 ### Fixed
 - 修复移动端首页留白以及文章、小记页标题和元信息显示异常的问题，优化手机端浏览体验。
 - 修复 Windows 下 `npm run check:preview-admin` 无法执行的问题。
+- 修复 Hero 图片与 Bits 头像在不同入口下校验规则不一致的问题；Theme Console、内容配置与前台展示现已保持一致。
+- 修复 Theme Console 在本地开发环境 `/admin/` 首次载入配置时的注入风险。
+- 修复 Markdown 正文中的表格在文章页展示异常的问题。
+- 补齐字体子集重建的依赖与步骤说明；缺失 `pyftsubset` 时，脚本现在会直接提示安装方式。
 
 ## [0.3.0] - 2026-03-21
 

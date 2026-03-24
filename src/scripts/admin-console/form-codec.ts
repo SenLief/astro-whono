@@ -16,10 +16,9 @@ import {
   ADMIN_NAV_ORNAMENT_DEFAULT,
   ADMIN_SIDEBAR_DIVIDER_DEFAULT,
   ADMIN_SOCIAL_PRESET_ORDER_DEFAULT,
+  canonicalizeAdminThemeSettings,
   isAdminHomeIntroLinkKey,
-  isAdminHeroPresetId,
   isAdminNavId,
-  isAdminSidebarDividerVariant,
   normalizeAdminHeroImageSrc,
   normalizeAdminSocialIconKey
 } from '@/lib/admin-console/shared';
@@ -30,7 +29,6 @@ export type EditableNavItem = EditableSettings['shell']['nav'][number];
 export type SocialPresetOrder = Record<SiteSocialPresetId, number>;
 
 type Query = <T extends Element>(parent: ParentNode, selector: string) => T | null;
-type LooseRecord = Record<string, unknown>;
 
 type FormCodecContext = {
   footerStartYearMax: number;
@@ -95,9 +93,6 @@ type FormCodecContext = {
   inputSidebarDividerNone: HTMLInputElement;
 };
 
-const isRecord = (value: unknown): value is LooseRecord =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 const normalizeMultiline = (value: string): string => value.replace(/\r\n/g, '\n');
 
 const normalizeOptionalSingleLine = (value: string): string | null => {
@@ -109,13 +104,6 @@ const normalizeSingleLine = (value: unknown, fallback = ''): string => {
   if (typeof value !== 'string') return fallback;
   const normalized = normalizeMultiline(value).trim();
   return normalized.includes('\n') ? fallback : normalized;
-};
-
-const normalizeNavOrnament = (value: unknown): string | null => {
-  if (value === null) return null;
-  if (typeof value !== 'string') return ADMIN_NAV_ORNAMENT_DEFAULT;
-  const normalized = normalizeMultiline(value).trim();
-  return normalized || null;
 };
 
 export const normalizeEmail = (value: string): string => value.replace(/^mailto:/i, '').trim();
@@ -368,179 +356,12 @@ export const createFormCodec = ({
     footerYearRangeEl.dataset.currentYearEnabled = String(Boolean(inputSiteFooterShowCurrentYear.checked));
   };
 
-  const canonicalize = (settings: unknown): EditableSettings => {
-    type SortableCustomItem = EditableCustomSocialItem & { __index: number };
-
-    const next = isRecord(settings) ? settings : {};
-    const site = isRecord(next.site) ? next.site : {};
-    const shell = isRecord(next.shell) ? next.shell : {};
-    const home = isRecord(next.home) ? next.home : {};
-    const page = isRecord(next.page) ? next.page : {};
-    const ui = isRecord(next.ui) ? next.ui : {};
-    const siteFooter = isRecord(site.footer) ? site.footer : {};
-    const socialLinks = isRecord(site.socialLinks) ? site.socialLinks : {};
-    const customItems = Array.isArray(socialLinks.custom) ? socialLinks.custom : [];
-    const bitsPage = isRecord(page.bits) ? page.bits : {};
-    const bitsDefaultAuthor = isRecord(bitsPage.defaultAuthor) ? bitsPage.defaultAuthor : {};
-
-    const normalizedCustom: EditableCustomSocialItem[] = customItems
-      .map((item, index) => {
-        const record = isRecord(item) ? item : {};
-        const iconKey = normalizeAdminSocialIconKey(record.iconKey) ?? defaultCustomSocialIconKey;
-        const sortableItem: SortableCustomItem = {
-          id: normalizeTrimmed(record.id),
-          label: normalizeCustomSocialLabel(record.label, iconKey),
-          href: normalizeTrimmed(record.href),
-          iconKey,
-          visible: Boolean(record.visible),
-          order: parseOrder(record.order as string | number | null | undefined, index + 1),
-          __index: index
-        };
-        return sortableItem;
-      })
-      .sort((a, b) => {
-        if (a.order !== b.order) return a.order - b.order;
-        const idCompare = a.id.localeCompare(b.id);
-        if (idCompare !== 0) return idCompare;
-        return a.__index - b.__index;
-      })
-      .map(({ __index, ...item }) => item);
-
-    const normalizedNav = (Array.isArray(shell.nav) ? shell.nav : [])
-      .map((item) => {
-        const record = isRecord(item) ? item : null;
-        if (!record) return null;
-        const id = normalizeTrimmed(record.id);
-        if (!isAdminNavId(id)) return null;
-        return {
-          id,
-          label: normalizeTrimmed(record.label),
-          ornament: normalizeNavOrnament(record.ornament),
-          order: parseOrder(record.order as string | number | null | undefined, ADMIN_NAV_IDS.indexOf(id) + 1),
-          visible: Boolean(record.visible)
-        };
-      })
-      .filter((item): item is EditableNavItem => item !== null)
-      .sort((a, b) => {
-        if (a.order !== b.order) return a.order - b.order;
-        return ADMIN_NAV_IDS.indexOf(a.id) - ADMIN_NAV_IDS.indexOf(b.id);
-      });
-
-    const rawHeroPresetId = normalizeTrimmed(home.heroPresetId);
-    const heroImageSrc = normalizeHeroImageSrc(home.heroImageSrc);
-    const heroImageAlt = normalizeHeroImageAlt(home.heroImageAlt);
-    const rawPresetOrder = isRecord(socialLinks.presetOrder) ? socialLinks.presetOrder : {};
-    const showIntroLead =
-      typeof home.showIntroLead === 'boolean' ? home.showIntroLead : true;
-    const showIntroMore =
-      typeof home.showIntroMore === 'boolean' ? home.showIntroMore : true;
-    const introMoreLinks = normalizeHomeIntroLinks(home.introMoreLinks);
-    const rawUiArticleMeta: LooseRecord = isRecord(ui.articleMeta) ? ui.articleMeta : {};
-    const rawUiLayout: LooseRecord = isRecord(ui.layout) ? ui.layout : {};
-    const rawSidebarDivider = normalizeTrimmed(rawUiLayout.sidebarDivider);
-
-    return {
-      site: {
-        title: normalizeTrimmed(site.title),
-        description: normalizeMultiline(String(site.description ?? '')).trim(),
-        defaultLocale: normalizeTrimmed(site.defaultLocale),
-        footer: {
-          startYear: parseInteger(siteFooter.startYear as string | number | null | undefined) ?? footerStartYearMax,
-          showCurrentYear: Boolean(siteFooter.showCurrentYear),
-          copyright: normalizeTrimmed(siteFooter.copyright)
-        },
-        socialLinks: {
-          github: normalizeTrimmed(socialLinks.github) || null,
-          x: normalizeTrimmed(socialLinks.x) || null,
-          email: normalizeEmail(normalizeTrimmed(socialLinks.email)) || null,
-          presetOrder: {
-            github: parseOrder(
-              rawPresetOrder.github as string | number | null | undefined,
-              ADMIN_SOCIAL_PRESET_ORDER_DEFAULT.github
-            ),
-            x: parseOrder(
-              rawPresetOrder.x as string | number | null | undefined,
-              ADMIN_SOCIAL_PRESET_ORDER_DEFAULT.x
-            ),
-            email: parseOrder(
-              rawPresetOrder.email as string | number | null | undefined,
-              ADMIN_SOCIAL_PRESET_ORDER_DEFAULT.email
-            )
-          },
-          custom: normalizedCustom
-        }
-      },
-      shell: {
-        brandTitle: normalizeTrimmed(shell.brandTitle),
-        quote: normalizeMultiline(String(shell.quote ?? '')).trim(),
-        nav: normalizedNav
-      },
-      home: {
-        introLead: normalizeMultiline(String(home.introLead ?? '')).trim(),
-        introMore: normalizeMultiline(String(home.introMore ?? '')).trim(),
-        introMoreLinks,
-        showIntroLead,
-        showIntroMore,
-        heroPresetId: isAdminHeroPresetId(rawHeroPresetId) ? rawHeroPresetId : 'default',
-        heroImageSrc,
-        heroImageAlt
-      },
-      page: {
-        essay: {
-          title: normalizeOptionalSingleLine(String(isRecord(page.essay) ? page.essay.title ?? '' : '')),
-          subtitle: normalizeOptionalSingleLine(String(isRecord(page.essay) ? page.essay.subtitle ?? '' : ''))
-        },
-        archive: {
-          title: normalizeOptionalSingleLine(String(isRecord(page.archive) ? page.archive.title ?? '' : '')),
-          subtitle: normalizeOptionalSingleLine(String(isRecord(page.archive) ? page.archive.subtitle ?? '' : ''))
-        },
-        bits: {
-          title: normalizeOptionalSingleLine(String(bitsPage.title ?? '')),
-          subtitle: normalizeOptionalSingleLine(String(bitsPage.subtitle ?? '')),
-          defaultAuthor: {
-            name: normalizeTrimmed(bitsDefaultAuthor.name),
-            avatar: normalizeTrimmed(bitsDefaultAuthor.avatar)
-          }
-        },
-        memo: {
-          title: normalizeOptionalSingleLine(String(isRecord(page.memo) ? page.memo.title ?? '' : '')),
-          subtitle: normalizeOptionalSingleLine(String(isRecord(page.memo) ? page.memo.subtitle ?? '' : ''))
-        },
-        about: {
-          title: normalizeOptionalSingleLine(String(isRecord(page.about) ? page.about.title ?? '' : '')),
-          subtitle: normalizeOptionalSingleLine(String(isRecord(page.about) ? page.about.subtitle ?? '' : ''))
-        }
-      },
-      ui: {
-        codeBlock: {
-          showLineNumbers: Boolean(isRecord(ui.codeBlock) ? ui.codeBlock.showLineNumbers : false)
-        },
-        readingMode: {
-          showEntry: Boolean(isRecord(ui.readingMode) ? ui.readingMode.showEntry : false)
-        },
-        articleMeta: {
-          showDate: typeof rawUiArticleMeta.showDate === 'boolean'
-            ? rawUiArticleMeta.showDate
-            : true,
-          dateLabel: normalizeSingleLine(rawUiArticleMeta.dateLabel, ADMIN_ARTICLE_META_DATE_LABEL_DEFAULT),
-          showTags: typeof rawUiArticleMeta.showTags === 'boolean'
-            ? rawUiArticleMeta.showTags
-            : true,
-          showWordCount: typeof rawUiArticleMeta.showWordCount === 'boolean'
-            ? rawUiArticleMeta.showWordCount
-            : true,
-          showReadingTime: typeof rawUiArticleMeta.showReadingTime === 'boolean'
-            ? rawUiArticleMeta.showReadingTime
-            : true
-        },
-        layout: {
-          sidebarDivider: isAdminSidebarDividerVariant(rawSidebarDivider)
-            ? rawSidebarDivider
-            : ADMIN_SIDEBAR_DIVIDER_DEFAULT
-        }
-      }
-    };
-  };
+  const canonicalize = (settings: unknown): EditableSettings =>
+    canonicalizeAdminThemeSettings(settings, {
+      footerStartYearMax,
+      defaultCustomSocialIconKey,
+      normalizeCustomSocialLabel
+    });
 
   const collectSettings = (): EditableSettings => {
     const nav = getNavRows().map((row, index): EditableNavItem => {

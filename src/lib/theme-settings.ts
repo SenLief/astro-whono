@@ -20,8 +20,11 @@ import {
   ADMIN_SOCIAL_ORDER_MAX,
   ADMIN_SOCIAL_ORDER_MIN,
   ADMIN_SOCIAL_PRESET_IDS,
+  createAdminWritableThemeSettingsGroups,
   getAdminBitsAvatarLocalFilePath,
   getAdminNavOrderIssues,
+  getAdminThemeSettingsGroupFileName,
+  getAdminThemeSettingsMismatchPaths,
   getAdminSocialOrderIssues,
   ADMIN_SIDEBAR_DIVIDER_DEFAULT,
   getAdminHeroImageLocalFilePath,
@@ -281,7 +284,7 @@ export type ThemeSettingsFileGroup = 'site' | 'shell' | 'home' | 'page' | 'ui';
 export interface ThemeSettingsReadDiagnostic {
   group: ThemeSettingsFileGroup;
   path: string;
-  code: 'invalid-json' | 'invalid-root' | 'read-failed';
+  code: 'invalid-json' | 'invalid-root' | 'read-failed' | 'schema-mismatch';
   message: string;
   detail?: string;
   line?: number;
@@ -303,7 +306,9 @@ export type ThemeSettingsEditableState =
     }
   | ThemeSettingsEditableErrorState;
 
-const SETTINGS_DIR = join(process.cwd(), 'src', 'data', 'settings');
+const DEFAULT_SETTINGS_DIR = join(process.cwd(), 'src', 'data', 'settings');
+const INTERNAL_TEST_SETTINGS_DIR_ENV = 'ASTRO_WHONO_INTERNAL_TEST_SETTINGS_DIR';
+const INTERNAL_TEST_SETTINGS_FLAG_ENV = 'ASTRO_WHONO_INTERNAL_TEST_SETTINGS';
 const SETTINGS_FILE_GROUPS: readonly ThemeSettingsFileGroup[] = ['site', 'shell', 'home', 'page', 'ui'];
 const SETTINGS_RELATIVE_PATHS: Record<ThemeSettingsFileGroup, string> = {
   site: 'src/data/settings/site.json',
@@ -312,6 +317,23 @@ const SETTINGS_RELATIVE_PATHS: Record<ThemeSettingsFileGroup, string> = {
   page: 'src/data/settings/page.json',
   ui: 'src/data/settings/ui.json'
 };
+
+const isInternalThemeSettingsDirOverrideEnabled = (): boolean =>
+  process.env[INTERNAL_TEST_SETTINGS_FLAG_ENV] === '1' || process.env.VITEST === 'true';
+
+const resolveInternalThemeSettingsDirOverride = (): string | null => {
+  if (!isInternalThemeSettingsDirOverrideEnabled()) return null;
+  const rawValue = process.env[INTERNAL_TEST_SETTINGS_DIR_ENV]?.trim();
+  return rawValue ? rawValue : null;
+};
+
+export const getThemeSettingsDir = (): string => resolveInternalThemeSettingsDirOverride() ?? DEFAULT_SETTINGS_DIR;
+
+export const getThemeSettingsFilePath = (group: ThemeSettingsFileGroup): string =>
+  join(getThemeSettingsDir(), getAdminThemeSettingsGroupFileName(group));
+
+export const getThemeSettingsRelativePath = (group: ThemeSettingsFileGroup): string => SETTINGS_RELATIVE_PATHS[group];
+
 const THEME_SETTINGS_INVALID_MESSAGE =
   '检测到 settings JSON 配置文件损坏，Theme Console 已停止读取并禁止保存，请先修复对应文件后再重试';
 
@@ -690,7 +712,9 @@ const createThemeSettingsReadDiagnostic = (
       ? `${path} 不是合法 JSON`
       : code === 'invalid-root'
         ? `${path} 的根节点必须是 JSON 对象`
-        : `${path} 读取失败`;
+        : code === 'schema-mismatch'
+          ? `${path} 存在无效或非规范配置值`
+          : `${path} 读取失败`;
   const location = extractDiagnosticLocation(detail);
 
   return {
@@ -707,7 +731,7 @@ const readSettingsObject = (
   name: ThemeSettingsFileGroup,
   diagnostics: ThemeSettingsReadDiagnostic[] = []
 ): Record<string, unknown> | undefined => {
-  const filePath = join(SETTINGS_DIR, `${name}.json`);
+  const filePath = getThemeSettingsFilePath(name);
   if (!existsSync(filePath)) return undefined;
 
   try {
@@ -738,10 +762,55 @@ const readSettingsObject = (
   }
 };
 
-export const getThemeSettingsReadDiagnostics = (): ThemeSettingsReadDiagnostic[] => {
+const readThemeSettingsObjects = (
+  diagnostics: ThemeSettingsReadDiagnostic[] = []
+): Partial<Record<ThemeSettingsFileGroup, Record<string, unknown>>> => {
+  const settingsObjects: Partial<Record<ThemeSettingsFileGroup, Record<string, unknown>>> = {};
+  for (const group of SETTINGS_FILE_GROUPS) {
+    const settingsObject = readSettingsObject(group, diagnostics);
+    if (settingsObject) {
+      settingsObjects[group] = settingsObject;
+    }
+  }
+  return settingsObjects;
+};
+
+const collectThemeSettingsSchemaDiagnostics = (
+  rawSettings: Partial<Record<ThemeSettingsFileGroup, Record<string, unknown>>>,
+  resolved: ThemeSettingsResolved
+): ThemeSettingsReadDiagnostic[] => {
+  const editableSnapshot = buildEditableThemeSettingsSnapshot(resolved);
+  const canonicalGroups = createAdminWritableThemeSettingsGroups(editableSnapshot);
   const diagnostics: ThemeSettingsReadDiagnostic[] = [];
-  for (const name of SETTINGS_FILE_GROUPS) {
-    readSettingsObject(name, diagnostics);
+
+  for (const group of SETTINGS_FILE_GROUPS) {
+    const rawGroup = rawSettings[group];
+    if (!rawGroup) continue;
+
+    const mismatchPaths = getAdminThemeSettingsMismatchPaths(rawGroup, canonicalGroups[group], 'exact');
+    if (!mismatchPaths.length) continue;
+
+    const summarizedPaths = mismatchPaths.slice(0, 6);
+    const suffix = mismatchPaths.length > summarizedPaths.length ? ' 等' : '';
+    diagnostics.push(
+      createThemeSettingsReadDiagnostic(
+        group,
+        'schema-mismatch',
+        `以下字段会在读取时被静默修补：${summarizedPaths.join(', ')}${suffix}`
+      )
+    );
+  }
+
+  return diagnostics;
+};
+
+export const getThemeSettingsReadDiagnostics = (
+  resolved: ThemeSettingsResolved = getThemeSettings()
+): ThemeSettingsReadDiagnostic[] => {
+  const diagnostics: ThemeSettingsReadDiagnostic[] = [];
+  const rawSettings = readThemeSettingsObjects(diagnostics);
+  if (diagnostics.length === 0) {
+    diagnostics.push(...collectThemeSettingsSchemaDiagnostics(rawSettings, resolved));
   }
 
   return cloneThemeSettingsReadDiagnostics(diagnostics);
@@ -1482,7 +1551,8 @@ export const getEditableThemeSettingsPayload = (
 export const getEditableThemeSettingsState = (
   resolved?: ThemeSettingsResolved
 ): ThemeSettingsEditableState => {
-  const diagnostics = getThemeSettingsReadDiagnostics();
+  const currentResolved = resolved ?? getThemeSettings();
+  const diagnostics = getThemeSettingsReadDiagnostics(currentResolved);
   if (diagnostics.length > 0) {
     return {
       ok: false,
@@ -1495,7 +1565,7 @@ export const getEditableThemeSettingsState = (
 
   return {
     ok: true,
-    payload: getEditableThemeSettingsPayload(resolved ?? getThemeSettings())
+    payload: getEditableThemeSettingsPayload(currentResolved)
   };
 };
 

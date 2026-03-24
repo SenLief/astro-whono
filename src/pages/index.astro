@@ -389,12 +389,7 @@ body[data-reading="immersive"] .reader-toggle .icon-book-open {
   font-weight: 600;
 }
 
-.meta-line {
-  color: var(--faint);
-  font-size: 12px;
-  font-family: "LXGW WenKai Lite", "Kaiti SC", "STKaiti", serif;
-}
-
+/* Keep above-the-fold EntryListItem copy stable until the deferred global stylesheet arrives. */
 .list-item__excerpt {
   margin: 10px 0 0;
   color: #666;
@@ -408,12 +403,42 @@ body[data-reading="immersive"] .reader-toggle .icon-book-open {
   font-family: "LXGW WenKai Lite", "Kaiti SC", "STKaiti", serif;
 }
 
-.site-footer {
-  margin-top: auto;
-  padding: 40px 0 10px;
-  text-align: center;
-  font-size: 12px;
+.meta-line {
+  margin-top: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
   color: var(--faint);
+}
+
+.meta-line--items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.meta-line__item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.meta-line__item--tags {
+  gap: 0.65em;
+}
+
+.meta-line__item + .meta-line__item::before {
+  content: "·";
+  margin: 0 0.45em;
+  color: var(--faint);
+}
+
+.list-item .meta-line {
+  margin-top: 12px;
+  margin-bottom: 8px;
+  padding-top: 0;
+}
+
+.meta-line .tag {
+  color: var(--accent);
 }
 
 @media (min-width: 901px) {
@@ -546,12 +571,6 @@ body[data-reading="immersive"] .reader-toggle .icon-book-open {
 
   .list-item {
     padding: 16px 0;
-  }
-
-  .list-item__row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
   }
 }
 

@@ -51,6 +51,7 @@ const pageDescription = joinPageSubtitleText(
 
 const primaryYearOptions = yearOptions.slice(0, MAX_PRIMARY_BITS_FILTER_YEARS);
 const overflowYearOptions = yearOptions.slice(MAX_PRIMARY_BITS_FILTER_YEARS);
+const priorityMediaBitId = items.find((bit) => (bit.data.images?.length ?? 0) > 0)?.id ?? null;
 
 const cards = await Promise.all(
   items.map(async (bit) => {
@@ -203,7 +204,7 @@ const cards = await Promise.all(
   <div data-bits-browse>
     <div id="bits-list">
       {cards.map(({ bit, excerpt, Content }) => (
-        <BitCard bit={bit} excerpt={excerpt} Content={Content} />
+        <BitCard bit={bit} excerpt={excerpt} Content={Content} prioritizeLeadMedia={bit.id === priorityMediaBitId} />
       ))}
     </div>
 

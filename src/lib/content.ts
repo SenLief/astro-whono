@@ -218,7 +218,7 @@ export async function getVisibleEssayRouteEntries(options: EssayQueryOptions = {
   return essays.map((entry, index) => ({
     slug: getEssaySlug(entry),
     entry,
-    prev: essays.at(index - 1) ?? null,
-    next: essays.at(index + 1) ?? null
+    prev: essays[index - 1] ?? null,
+    next: essays[index + 1] ?? null
   })) satisfies EssayRouteEntry[];
 }

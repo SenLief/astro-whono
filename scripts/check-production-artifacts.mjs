@@ -1,11 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { build } from 'astro';
 import { assertAdminSettingsStaticShell, expect } from './smoke-utils.mjs';
-
-const DEFAULT_CI_SITE_URL = 'https://example.com';
-const cliArgs = new Set(process.argv.slice(2));
 
 const normalizeSiteUrl = (value) => value.trim().replace(/\/+$/, '');
 
@@ -19,6 +15,9 @@ const readText = (filePath) => {
   expect(existsSync(filePath), `Expected build artifact is missing: ${filePath}`);
   return readFileSync(filePath, 'utf8');
 };
+
+const PREV_LINK_PATTERN = /<a class="prev-next__link prev-next__link--prev"[^>]*rel="prev">/;
+const NEXT_LINK_PATTERN = /<a class="prev-next__link prev-next__link--next"[^>]*rel="next">/;
 
 export const runProductionArtifactCheck = async (options = {}) => {
   const siteUrl = options.siteUrl ?? resolveRequiredSiteUrl();
@@ -76,6 +75,13 @@ export const runProductionArtifactCheck = async (options = {}) => {
   expect(!/\.admin-/.test(aboutHtml), 'Public about page still contains admin CSS rules');
   expect(!/--admin-status-/.test(aboutHtml), 'Public about page still contains admin CSS tokens');
 
+  const adminHtml = readText('dist/admin/index.html');
+  expect(!/index@_@astro\.[^"]+\.css/.test(adminHtml), 'Readonly admin page still links admin-only CSS');
+  expect(
+    !/<script type="module" src="\/_astro\/[^"]+"><\/script>/.test(adminHtml),
+    'Readonly admin page still links an external _astro module script'
+  );
+
   const indexHtml = readText('dist/index.html');
   expect(
     /<h1 class="sr-only">[^<]+<\/h1>/.test(indexHtml),
@@ -85,6 +91,36 @@ export const runProductionArtifactCheck = async (options = {}) => {
     /\.sr-only\s*\{/.test(indexHtml),
     'Homepage critical CSS is missing the .sr-only rule'
   );
+  if (/class="list-item__excerpt"/.test(indexHtml)) {
+    expect(
+      /\.list-item__excerpt\s*\{/.test(indexHtml),
+      'Homepage critical CSS is missing the .list-item__excerpt rule for above-the-fold entries'
+    );
+  }
+  if (/class="meta-line meta-line--items"/.test(indexHtml)) {
+    const requiredHomeMetaRules = [
+      [/\.meta-line\s*\{/, 'Homepage critical CSS is missing the .meta-line rule for above-the-fold entries'],
+      [/\.meta-line--items\s*\{/, 'Homepage critical CSS is missing the .meta-line--items rule for above-the-fold entries'],
+      [/\.meta-line__item\s*\{/, 'Homepage critical CSS is missing the .meta-line__item rule for above-the-fold entries'],
+      [/\.meta-line__item--tags\s*\{/, 'Homepage critical CSS is missing the .meta-line__item--tags rule for above-the-fold entries'],
+      [
+        /\.meta-line__item\s*\+\s*\.meta-line__item::before\s*\{/,
+        'Homepage critical CSS is missing the .meta-line__item + .meta-line__item::before separator rule'
+      ],
+      [/\.list-item\s+\.meta-line\s*\{/, 'Homepage critical CSS is missing the .list-item .meta-line spacing rule'],
+      [/\.meta-line\s+\.tag\s*\{/, 'Homepage critical CSS is missing the .meta-line .tag color rule']
+    ];
+
+    for (const [pattern, message] of requiredHomeMetaRules) {
+      expect(pattern.test(indexHtml), message);
+    }
+  }
+  if (/class="list-item list-item--link"/.test(indexHtml)) {
+    expect(
+      /@media\s*\(max-width:\s*900px\)\s*\{[\s\S]*?\.list-item\s*\{\s*padding:\s*16px\s+0;/.test(indexHtml),
+      'Homepage critical CSS is missing the mobile .list-item spacing rule for above-the-fold entries'
+    );
+  }
   expect(
     /<link(?=[^>]+rel="preload")(?=[^>]+href="[^"]*global[^"]*")(?=[^>]+as="style")[^>]*>/.test(indexHtml),
     'Homepage is no longer preloading the deferred global stylesheet'
@@ -191,24 +227,27 @@ export const runProductionArtifactCheck = async (options = {}) => {
     `Archive detail page still contains admin CSS tokens: ${sampleArchiveHtmlPath}`
   );
 
+  const latestEssayLink = essayRssLinks[0];
+  const latestEssayHtmlPath = normalizeArchiveDetailPath(latestEssayLink);
+  const latestEssayHtml = readText(latestEssayHtmlPath);
+  expect(
+    !PREV_LINK_PATTERN.test(latestEssayHtml),
+    `Latest essay detail page should not render a prev link: ${latestEssayHtmlPath}`
+  );
+
+  const oldestEssayLink = essayRssLinks.at(-1);
+  expect(oldestEssayLink, 'Essay RSS does not contain an oldest item link');
+  const oldestEssayHtmlPath = normalizeArchiveDetailPath(oldestEssayLink);
+  const oldestEssayHtml = readText(oldestEssayHtmlPath);
+  expect(
+    !NEXT_LINK_PATTERN.test(oldestEssayHtml),
+    `Oldest essay detail page should not render a next link: ${oldestEssayHtmlPath}`
+  );
+
   const adminSettingsArtifact = readText('dist/api/admin/settings');
   assertAdminSettingsStaticShell('dist/api/admin/settings', adminSettingsArtifact);
 
   console.log('Production artifact verification passed.');
-};
-
-export const runProductionVerificationGate = async () => {
-  const siteUrl = normalizeSiteUrl(process.env.SITE_URL ?? '') || DEFAULT_CI_SITE_URL;
-  process.env.SITE_URL = siteUrl;
-
-  console.log(`[ci:prod] Building with SITE_URL=${siteUrl}`);
-  await build({});
-  await runProductionArtifactCheck({ siteUrl });
-
-  const { runPreviewAdminBoundaryCheck } = await import('./check-preview-admin-boundary.mjs');
-  await runPreviewAdminBoundaryCheck();
-
-  console.log('Production verification gate passed.');
 };
 
 const isDirectExecution = process.argv[1]
@@ -217,11 +256,7 @@ const isDirectExecution = process.argv[1]
 
 if (isDirectExecution) {
   try {
-    if (cliArgs.has('--full-gate')) {
-      await runProductionVerificationGate();
-    } else {
-      await runProductionArtifactCheck();
-    }
+    await runProductionArtifactCheck();
   } catch (error) {
     console.error(error instanceof Error && error.stack ? error.stack : error);
     process.exit(1);

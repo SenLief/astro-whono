@@ -42,5 +42,5 @@ jobs:
       - name: Security audit gate (high+ prod dependencies)
         run: npm run audit:prod
 
-      - name: Run full CI gate
+      - name: Run CI gate
         run: npm run ci
