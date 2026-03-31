@@ -31,6 +31,36 @@
     grid-template-columns: 1fr;
   }
 
+  .admin-shell__lead {
+    gap: 8px;
+  }
+
+  .admin-route-nav {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+  }
+
+  .admin-route-nav__list {
+    flex-wrap: nowrap;
+    width: max-content;
+    min-width: 100%;
+    gap: 8px 14px;
+  }
+
+  .admin-route-nav__item {
+    min-width: fit-content;
+  }
+
+  .admin-route-nav__link {
+    min-height: 34px;
+    padding-bottom: 10px;
+  }
+
+  .admin-overview__grid {
+    grid-template-columns: 1fr;
+  }
+
   .admin-field--memo > input,
   .admin-field--memo > .admin-title-pair {
     max-width: none;

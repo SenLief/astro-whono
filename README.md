@@ -189,10 +189,13 @@ npm run dev
 在浏览器中打开 `http://localhost:4321/admin/`
 (如果你修改了开发端口，请将 `4321` 替换为实际端口。)
 
+- `/admin/`：后台稳定入口与概览页
+- `/admin/theme/`：Theme Console 实际编辑页
+
 #### 生产环境说明
 
 - Theme Console 仅在本地开发环境可用，支持读取、校验和保存配置
-- 生产构建保持静态站点输出；`/admin/` 仅显示只读提示
+- 生产构建保持静态站点输出；`/admin/` 与 `/admin/theme/` 仅显示只读提示
 - `/api/admin/settings/` 仅供本地开发使用，生产环境不要依赖该接口
 
 

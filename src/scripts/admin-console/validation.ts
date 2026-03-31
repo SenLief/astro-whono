@@ -2,7 +2,7 @@ import type {
   SidebarNavId,
   SiteSocialPresetId
 } from '@/lib/theme-settings';
-import { validateAdminThemeSettings } from '@/lib/admin-console/shared';
+import { validateAdminThemeSettings } from '@/lib/admin-console/theme-shared';
 import { type EditableSettings } from './form-codec';
 
 export type ValidationIssue = {

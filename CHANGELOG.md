@@ -7,6 +7,15 @@ The format is based on Keep a Changelog, and this project aims to follow Semanti
 
 ## [Unreleased]
 
+### Added
+- 新增后台真实路由壳层：`/admin/` 现为后台稳定入口与概览页，`/admin/theme/` 承担 Theme Console 实际编辑工作流。
+- 新增 `AdminLayout / AdminShell / AdminNav` 共享后台壳层，以及 `theme-shared.ts` 作为 Theme Console 新共享入口。
+
+### Changed
+- Theme Console 的未保存离开提醒从单纯 `beforeunload` 扩展为路由级 dirty guard；切换后台真实路由时会先显式确认。
+- `/admin` 边界检查与静态产物校验现同步覆盖 `/admin/` 与 `/admin/theme/`，并确保两者继续排除在 sitemap 之外。
+- Theme Console 共享规则实现已迁入 `theme-shared.ts`；`shared.ts` 现退为兼容导出层，降低后续后台能力继续堆进旧文件的风险。
+
 ## [0.3.1] - 2026-03-24
 
 ### Changed

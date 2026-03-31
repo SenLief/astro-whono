@@ -1,5 +1,5 @@
 /* Admin Nav
-   负责侧栏导航排序编辑表格与其局部输入框框架。
+   负责后台真实路由 tabs 与侧栏导航排序编辑表格。
 */
 
 .admin-nav-row input[type='number'] {
@@ -202,4 +202,94 @@
   font-size: 11px;
   line-height: 1.4;
   font-family: "LXGW WenKai Lite", "Kaiti SC", "STKaiti", serif;
+}
+
+.admin-route-nav {
+  position: relative;
+  min-width: 0;
+  padding: 0;
+}
+
+.admin-route-nav::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--border) 88%, transparent);
+}
+
+.admin-route-nav__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+
+.admin-route-nav__item {
+  position: relative;
+  min-width: fit-content;
+  max-width: 100%;
+}
+
+.admin-route-nav__link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  max-width: 100%;
+  padding: 6px 2px 12px;
+  color: var(--muted);
+  text-decoration: none;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.admin-route-nav__link::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 82%, transparent);
+  transform: scaleX(0.35);
+  transform-origin: center;
+  opacity: 0;
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.admin-route-nav__link:hover {
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.admin-route-nav__link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.admin-route-nav__link.is-active {
+  color: var(--text);
+  transform: none;
+}
+
+.admin-route-nav__link.is-active::after {
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+.admin-route-nav__label {
+  font-size: 15px;
+  line-height: 1.3;
+  white-space: nowrap;
 }

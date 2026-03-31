@@ -1,0 +1,17 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const { title, stylesHref = null } = Astro.props as {
+  title: string;
+  stylesHref?: string | null;
+};
+---
+
+<BaseLayout title={title} bodyClass="admin-page">
+  <Fragment slot="head">
+    <meta name="robots" content="noindex,nofollow" />
+    {stylesHref ? <link rel="stylesheet" href={stylesHref} /> : null}
+    <slot name="head" />
+  </Fragment>
+  <slot />
+</BaseLayout>

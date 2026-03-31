@@ -17,7 +17,7 @@ import {
   createAdminWritableThemeSettingsGroups,
   getAdminFooterStartYearMax,
   validateAdminThemeSettings
-} from '../../../lib/admin-console/shared';
+} from '../../../lib/admin-console/theme-shared';
 
 const WRITABLE_GROUPS = ['site', 'shell', 'home', 'page', 'ui'] as const satisfies readonly ThemeSettingsFileGroup[];
 type WritableGroup = (typeof WRITABLE_GROUPS)[number];

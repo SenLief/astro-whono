@@ -38,6 +38,7 @@ const normalizeSitemapPathname = (page) => {
 
 const isExcludedSitemapPathname = (pathname) =>
   pathname === '/admin'
+  || pathname.startsWith('/admin/')
   || pathname === '/checks'
   || pathname.startsWith('/checks/')
   || pathname === '/bits/draft-dialog'

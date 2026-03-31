@@ -32,6 +32,7 @@ export const runProductionArtifactCheck = async (options = {}) => {
     'dist/index.html',
     'dist/about/index.html',
     'dist/bits/index.html',
+    'dist/admin/theme/index.html',
     'dist/api/admin/settings'
   ];
 
@@ -51,6 +52,7 @@ export const runProductionArtifactCheck = async (options = {}) => {
     'Sitemap is missing the expected /about/ location'
   );
   expect(!sitemapXml.includes('/admin/'), 'Admin route leaked into sitemap');
+  expect(!sitemapXml.includes('/admin/theme/'), 'Admin theme route leaked into sitemap');
   expect(
     !sitemapXml.includes(`${siteUrl}/bits/draft-dialog/`),
     'Bits draft partial route leaked into sitemap'
@@ -76,11 +78,23 @@ export const runProductionArtifactCheck = async (options = {}) => {
   expect(!/--admin-status-/.test(aboutHtml), 'Public about page still contains admin CSS tokens');
 
   const adminHtml = readText('dist/admin/index.html');
-  expect(!/index@_@astro\.[^"]+\.css/.test(adminHtml), 'Readonly admin page still links admin-only CSS');
-  expect(
-    !/<script type="module" src="\/_astro\/[^"]+"><\/script>/.test(adminHtml),
-    'Readonly admin page still links an external _astro module script'
-  );
+  const adminThemeHtml = readText('dist/admin/theme/index.html');
+  const readonlyAdminHtmlChecks = [
+    ['dist/admin/index.html', adminHtml, 'Admin Console', '/admin/theme/'],
+    ['dist/admin/theme/index.html', adminThemeHtml, 'Theme Console', '/admin/']
+  ];
+
+  for (const [filePath, html, heading, linkHref] of readonlyAdminHtmlChecks) {
+    expect(html.includes(heading), `${filePath} is missing the expected readonly heading`);
+    expect(html.includes(linkHref), `${filePath} is missing the expected admin route link`);
+    expect(!html.includes('data-admin-root'), `${filePath} should stay readonly outside dev`);
+    expect(!html.includes('id="admin-bootstrap"'), `${filePath} should not emit theme bootstrap payload`);
+    expect(!/index@_@astro\.[^"]+\.css/.test(html), `${filePath} still links admin-only CSS`);
+    expect(
+      !/<script type="module" src="\/_astro\/[^"]+"><\/script>/.test(html),
+      `${filePath} still links an external _astro module script`
+    );
+  }
 
   const indexHtml = readText('dist/index.html');
   expect(

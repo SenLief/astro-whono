@@ -1,0 +1,45 @@
+---
+import type { AdminRouteId } from '../../lib/admin-console/routes';
+import AdminNav from './AdminNav.astro';
+
+const {
+  currentRoute,
+  title,
+  subtitle,
+  description = null,
+  modeLabel,
+  modeHint = null
+} = Astro.props as {
+  currentRoute: AdminRouteId;
+  title: string;
+  subtitle: string;
+  description?: string | null;
+  modeLabel: string;
+  modeHint?: string | null;
+};
+---
+
+<section class="admin-console admin-console--shell">
+  <header class="page-header page-header--admin">
+    <div class="admin-heading">
+      <div class="admin-heading__copy">
+        <h1 class="page-title">{title}</h1>
+        <span class="page-subtitle">{subtitle}</span>
+      </div>
+      <span class="admin-mode-chip">{modeLabel}</span>
+    </div>
+    <slot name="status" />
+  </header>
+
+  <div class="admin-shell__lead">
+    {modeHint ? <p class="admin-hint admin-hint--mode">{modeHint}</p> : null}
+    <AdminNav currentRoute={currentRoute} />
+  </div>
+
+  <div class="admin-shell">
+    <div class="admin-shell__body">
+      {description ? <p class="admin-shell__description">{description}</p> : null}
+      <slot />
+    </div>
+  </div>
+</section>

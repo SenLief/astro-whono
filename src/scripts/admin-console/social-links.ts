@@ -4,7 +4,7 @@ import {
   ADMIN_SOCIAL_PRESET_ORDER_DEFAULT,
   normalizeAdminSocialIconKey,
   isAdminSocialPresetId
-} from '@/lib/admin-console/shared';
+} from '@/lib/admin-console/theme-shared';
 import type { EditableCustomSocialItem, SocialPresetOrder } from './form-codec';
 
 type Query = <T extends Element>(parent: ParentNode, selector: string) => T | null;

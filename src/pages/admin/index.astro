@@ -1,234 +1,67 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminLayout from '../../components/admin/AdminLayout.astro';
+import AdminShell from '../../components/admin/AdminShell.astro';
 import { createWithBase } from '../../utils/format';
 
 const isDev = import.meta.env.DEV;
 const base = import.meta.env.BASE_URL ?? '/';
 const withBase = createWithBase(base);
-
-const loadAdminDevState = async () => {
-  const [
-    { getEntry },
-    { getEditableThemeSettingsState },
-    {
-      ADMIN_FOOTER_START_YEAR_MIN,
-      ADMIN_HOME_INTRO_MAX_LENGTH,
-      ADMIN_NAV_IDS,
-      ADMIN_NAV_ORNAMENT_DEFAULT,
-      ADMIN_PAGE_TITLE_MAX_LENGTH,
-      ADMIN_PAGE_SUBTITLE_MAX_LENGTH,
-      ADMIN_SOCIAL_CUSTOM_LIMIT,
-      getAdminFooterStartYearMax
-    },
-    { default: AdminHomeSection },
-    { default: AdminPageSection },
-    { default: AdminSidebarSection },
-    { default: AdminSiteSection },
-    { default: AdminUiSection },
-    { default: adminConsoleScriptHref },
-    { default: adminStylesHref }
-  ] = await Promise.all([
-    import('astro:content'),
-    import('../../lib/theme-settings'),
-    import('../../lib/admin-console/shared'),
-    import('../../components/admin/AdminHomeSection.astro'),
-    import('../../components/admin/AdminPageSection.astro'),
-    import('../../components/admin/AdminSidebarSection.astro'),
-    import('../../components/admin/AdminSiteSection.astro'),
-    import('../../components/admin/AdminUiSection.astro'),
-    import('../../scripts/admin-console/index.ts?url'),
-    import('../../styles/components/admin.css?url')
-  ]);
-
-  const settingsEndpoint = withBase('/api/admin/settings/');
-  const navIdOrder = ADMIN_NAV_IDS;
-  const navLabelFallback = {
-    essay: '随笔',
-    bits: '絮语',
-    memo: '小记',
-    archive: '归档',
-    about: '关于'
-  } as const;
-  const homeIntroMaxLength = ADMIN_HOME_INTRO_MAX_LENGTH;
-  const pageTitleMaxLength = ADMIN_PAGE_TITLE_MAX_LENGTH;
-  const pageSubtitleMaxLength = ADMIN_PAGE_SUBTITLE_MAX_LENGTH;
-  const footerStartYearMin = ADMIN_FOOTER_START_YEAR_MIN;
-  const footerStartYearMax = getAdminFooterStartYearMax();
-  const socialCustomLimit = ADMIN_SOCIAL_CUSTOM_LIMIT;
-  const memoEntry = await getEntry('memo', 'index');
-  const memoTitlePlaceholder = typeof memoEntry?.data.title === 'string' ? memoEntry.data.title.trim() : '';
-  const memoSubtitlePlaceholder =
-    typeof memoEntry?.data.subtitle === 'string' ? memoEntry.data.subtitle.trim() : '';
-
-  const initialState = getEditableThemeSettingsState();
-  const bootstrapState = initialState.ok
-    ? (() => {
-        const initialNavMap = new Map(
-          initialState.payload.settings.shell.nav.map((item) => [item.id, item])
-        );
-
-        return {
-          ok: true as const,
-          payload: {
-            revision: initialState.payload.revision,
-            settings: {
-              ...initialState.payload.settings,
-              shell: {
-                ...initialState.payload.settings.shell,
-                nav: navIdOrder.map((id, index) => {
-                  const current = initialNavMap.get(id);
-                  if (current) return current;
-                  return {
-                    id,
-                    label: navLabelFallback[id],
-                    ornament: ADMIN_NAV_ORNAMENT_DEFAULT,
-                    visible: true,
-                    order: index + 1
-                  };
-                })
-              }
-            },
-            sources: initialState.payload.sources
-          }
-        };
-      })()
-    : initialState;
-
-  return {
-    AdminHomeSection,
-    AdminPageSection,
-    AdminSidebarSection,
-    AdminSiteSection,
-    AdminUiSection,
-    adminConsoleScriptHref,
-    adminStylesHref,
-    settingsEndpoint,
-    homeIntroMaxLength,
-    pageTitleMaxLength,
-    pageSubtitleMaxLength,
-    footerStartYearMin,
-    footerStartYearMax,
-    socialCustomLimit,
-    memoTitlePlaceholder,
-    memoSubtitlePlaceholder,
-    bootstrapText: JSON.stringify(bootstrapState),
-    navIdOrder
-  };
-};
-
-const adminDevState = isDev ? await loadAdminDevState() : null;
-const AdminHomeSection = adminDevState?.AdminHomeSection;
-const AdminPageSection = adminDevState?.AdminPageSection;
-const AdminSidebarSection = adminDevState?.AdminSidebarSection;
-const AdminSiteSection = adminDevState?.AdminSiteSection;
-const AdminUiSection = adminDevState?.AdminUiSection;
+const adminStylesHref = isDev ? (await import('../../styles/components/admin.css?url')).default : null;
 ---
 
-<BaseLayout title="Theme Console" bodyClass="admin-page">
-  <Fragment slot="head">
-    <meta name="robots" content="noindex,nofollow" />
-    {isDev && adminDevState?.adminStylesHref ? <link rel="stylesheet" href={adminDevState.adminStylesHref} /> : null}
-  </Fragment>
-
-  {
-    isDev && adminDevState && AdminHomeSection && AdminPageSection && AdminSidebarSection && AdminSiteSection && AdminUiSection ? (
-      <section class="admin-console" data-admin-root data-settings-endpoint={adminDevState.settingsEndpoint}>
-        <header class="page-header page-header--admin">
-          <div class="admin-heading">
-            <h1 class="page-title">Theme Console</h1>
-            <span class="page-subtitle">主题设置</span>
+<AdminLayout title="Admin Console" stylesHref={adminStylesHref}>
+  <AdminShell
+    currentRoute="overview"
+    title="Admin Console"
+    subtitle="后台概览"
+    description="Phase 0 先把后台从单页 Theme Console 收口为真实路由壳层：`/admin/` 负责稳定入口，`/admin/theme/` 承担现有主题配置工作流。"
+    modeLabel={isDev ? 'DEV 可写' : '只读模式'}
+    modeHint={isDev ? '当前后台仍以本地文件与 Git 为真相来源；生产环境继续保持只读。' : '当前环境仅保留后台入口与只读说明，不提供写入能力。'}
+  >
+    <section class="admin-overview">
+      <div class="admin-overview__grid">
+        <article class="admin-overview-card">
+          <p class="admin-overview-card__eyebrow">Ready Now</p>
+          <h2 class="admin-overview-card__title">Theme Console</h2>
+          <p class="admin-overview-card__body">
+            现有 `site / shell / home / page / ui` 设置继续沿用既有 bootstrap、校验、`dryRun`、`revision` 冲突保护与事务写盘链路。
+          </p>
+          <p class="admin-overview-card__meta">稳定子入口：`/admin/theme/`</p>
+          <div class="admin-overview-card__actions">
+            <a class="admin-btn admin-btn--muted" href={withBase('/admin/theme/')}>{isDev ? '进入 Theme Console' : '查看只读子入口'}</a>
           </div>
-          <p id="admin-status-live" class="admin-sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
-          <p id="admin-status" class="admin-status" data-state="idle">等待加载</p>
-        </header>
+        </article>
 
-        <section
-          id="admin-error-banner"
-          class="admin-banner admin-banner--error"
-          hidden
-          role="alert"
-          aria-atomic="true"
-          tabindex="-1"
-        >
-          <div class="admin-banner__header">
-            <div class="admin-banner__lead">
-              <span class="admin-banner__icon" aria-hidden="true">×</span>
-              <div class="admin-banner__copy">
-                <p id="admin-error-title" class="admin-banner__title">操作未完成</p>
-                <p id="admin-error-message" class="admin-banner__message" hidden></p>
-              </div>
-            </div>
-            <button
-              id="admin-error-retry"
-              class="admin-btn admin-btn--ghost admin-btn--danger admin-banner__retry"
-              type="button"
-              hidden
-            >
-              重新检查
-            </button>
-          </div>
-          <ul id="admin-error-list" class="admin-banner__list" hidden></ul>
-        </section>
+        <article class="admin-overview-card">
+          <p class="admin-overview-card__eyebrow">Phase 0</p>
+          <h2 class="admin-overview-card__title">路由壳层已独立</h2>
+          <p class="admin-overview-card__body">
+            后台导航、稳定入口与 Theme 子路由已经拆开，后续 `Content / Media / Checks / Data` 会在真实能力落地后再追加页面，而不是先铺空壳。
+          </p>
+          <ul class="admin-overview-card__list">
+            <li>保留 `/admin/` 作为后台稳定入口</li>
+            <li>保留 `/api/admin/settings/` 现有契约</li>
+            <li>继续限制为 DEV-only 可写后台</li>
+          </ul>
+        </article>
 
-        <form id="admin-form" class="admin-form" novalidate>
-          <AdminSiteSection
-            footerStartYearMin={adminDevState.footerStartYearMin}
-            footerStartYearMax={adminDevState.footerStartYearMax}
-            socialCustomLimit={adminDevState.socialCustomLimit}
-          />
+        <article class="admin-overview-card">
+          <p class="admin-overview-card__eyebrow">Dirty Guard</p>
+          <h2 class="admin-overview-card__title">页面切换会显式提醒</h2>
+          <p class="admin-overview-card__body">
+            `/admin/theme/` 的未保存状态不再只依赖浏览器离页提示；点击后台内部导航切换时，也会先确认是否放弃当前改动。
+          </p>
+        </article>
 
-          <AdminSidebarSection navIdOrder={adminDevState.navIdOrder} />
-
-          <AdminHomeSection homeIntroMaxLength={adminDevState.homeIntroMaxLength} />
-
-          <AdminPageSection
-            pageTitleMaxLength={adminDevState.pageTitleMaxLength}
-            pageSubtitleMaxLength={adminDevState.pageSubtitleMaxLength}
-            memoTitlePlaceholder={adminDevState.memoTitlePlaceholder}
-            memoSubtitlePlaceholder={adminDevState.memoSubtitlePlaceholder}
-          />
-
-          <AdminUiSection />
-        </form>
-
-        <div id="admin-actions-sentinel" class="admin-actions__sentinel" aria-hidden="true"></div>
-        <div id="admin-actions" class="admin-actions" data-dirty="false" data-sticky="false">
-          <div class="admin-actions__meta">
-            <p id="admin-dirty-banner" class="admin-banner admin-banner--dirty" hidden>
-              * 你有未保存更改，离开页面会触发提醒。
-            </p>
-            <p id="admin-status-inline" class="admin-status admin-status--inline" data-state="idle" aria-hidden="true">
-              等待加载
-            </p>
-          </div>
-          <div class="admin-actions__buttons">
-            <button id="admin-validate" class="admin-btn" type="button">检查配置</button>
-            <button id="admin-reset" class="admin-btn admin-btn--ghost" type="button">重置更改</button>
-            <button id="admin-save" class="admin-btn admin-btn--muted" type="button">保存</button>
-          </div>
-        </div>
-
-        <div id="admin-bootstrap" hidden>{adminDevState.bootstrapText}</div>
-      </section>
-    ) : (
-      <section class="admin-console admin-console--readonly">
-        <header class="page-header page-header--admin">
-          <div class="admin-heading">
-            <h1 class="page-title">Theme Console</h1>
-            <span class="page-subtitle">主题设置</span>
-          </div>
-        </header>
-        <p class="admin-hint">
-          Theme Console 仅在本地开发环境开放。如需修改配置，请在本地后台部署。
-        </p>
-      </section>
-    )
-  }
-
-  {
-    isDev && adminDevState?.adminConsoleScriptHref ? (
-      <script is:inline type="module" src={adminDevState.adminConsoleScriptHref}></script>
-    ) : null
-  }
-</BaseLayout>
+        <article class="admin-overview-card">
+          <p class="admin-overview-card__eyebrow">Readonly Boundary</p>
+          <h2 class="admin-overview-card__title">生产环境只保留结构，不开放写入</h2>
+          <p class="admin-overview-card__body">
+            preview / production 下仍然不提供后台写接口；本次只新增真实页面结构、路由排除规则和对应的边界检查。
+          </p>
+        </article>
+      </div>
+    </section>
+  </AdminShell>
+</AdminLayout>
 

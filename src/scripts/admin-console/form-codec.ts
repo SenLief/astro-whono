@@ -21,7 +21,7 @@ import {
   isAdminHomeIntroLinkKey,
   isAdminNavId,
   normalizeAdminSocialIconKey
-} from '@/lib/admin-console/shared';
+} from '@/lib/admin-console/theme-shared';
 
 export type EditableSettings = ThemeSettingsEditablePayload['settings'];
 export type EditableCustomSocialItem = EditableSettings['site']['socialLinks']['custom'][number];

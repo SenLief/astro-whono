@@ -69,6 +69,35 @@
   min-width: 0;
 }
 
+.admin-heading__copy {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--header-gap);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.admin-mode-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--panel) 0%, var(--code-content-bg) 100%);
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.admin-status-slot {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+
 .admin-sr-only {
   position: absolute;
   width: 1px;
@@ -193,6 +222,16 @@
   color: var(--muted);
   font-size: 14px;
   line-height: 1.7;
+}
+
+.admin-hint--mode {
+  margin: 0;
+}
+
+.admin-shell__lead {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
 }
 
 .admin-console--readonly .admin-hint {
@@ -393,6 +432,88 @@
   margin-top: 14px;
   display: grid;
   gap: 16px;
+}
+
+.admin-shell {
+  margin-top: 18px;
+  min-width: 0;
+}
+
+.admin-shell__body {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.admin-shell__description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+  max-width: 72ch;
+}
+
+.admin-overview {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-overview__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-overview-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--bg) 0%, var(--code-content-bg) 100%);
+  box-shadow: 0 20px 40px -34px var(--overlay-35);
+}
+
+.admin-overview-card__eyebrow {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-overview-card__title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.admin-overview-card__body,
+.admin-overview-card__meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.admin-overview-card__meta {
+  color: var(--faint);
+}
+
+.admin-overview-card__list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.admin-overview-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
 }
 
 .admin-console[data-console-locked='true'] .admin-form,

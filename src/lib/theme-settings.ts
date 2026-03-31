@@ -36,7 +36,7 @@ import {
   isAdminSocialOrderValue,
   isAdminSidebarDividerVariant,
   normalizeAdminSocialIconKey,
-} from './admin-console/shared';
+} from './admin-console/theme-shared';
 
 export type SettingSource = 'new' | 'legacy' | 'default';
 

@@ -8,8 +8,9 @@ import {
   ADMIN_NAV_IDS,
   ADMIN_SOCIAL_CUSTOM_LIMIT,
   getAdminFooterStartYearMax
-} from '@/lib/admin-console/shared';
+} from '@/lib/admin-console/theme-shared';
 import { createFormCodec, type EditableSettings } from './form-codec';
+import { shouldGuardAdminNavigation } from './navigation-guard';
 import { createSocialLinks } from './social-links';
 import { createValidation, type ValidationIssue } from './validation';
 
@@ -40,7 +41,13 @@ if (!root) {
   const queryAll = <T extends Element>(parent: ParentNode, selector: string): T[] =>
     Array.from(parent.querySelectorAll(selector)) as T[];
   const ensureElements = <T extends Record<string, Element | null>>(elements: T): RequiredElements<T> | null => {
-    if (Object.values(elements).some((element) => element === null)) return null;
+    const missingKeys = Object.entries(elements)
+      .filter(([, element]) => element === null)
+      .map(([key]) => key);
+    if (missingKeys.length > 0) {
+      console.error(`[admin-console] Missing required controls: ${missingKeys.join(', ')}`);
+      return null;
+    }
     return elements as RequiredElements<T>;
   };
   const isRecord = (value: unknown): value is LooseRecord =>
@@ -53,8 +60,6 @@ if (!root) {
     form: byId<HTMLFormElement>('admin-form'),
     adminActions: byId<HTMLElement>('admin-actions'),
     adminActionsSentinel: byId<HTMLElement>('admin-actions-sentinel'),
-    statusLiveEl: byId<HTMLElement>('admin-status-live'),
-    statusEl: byId<HTMLElement>('admin-status'),
     statusInlineEl: byId<HTMLElement>('admin-status-inline'),
     dirtyBanner: byId<HTMLElement>('admin-dirty-banner'),
     errorBanner: byId<HTMLElement>('admin-error-banner'),
@@ -130,8 +135,6 @@ if (!root) {
       form,
       adminActions,
       adminActionsSentinel,
-      statusLiveEl,
-      statusEl,
       statusInlineEl,
       dirtyBanner,
       errorBanner,
@@ -199,6 +202,8 @@ if (!root) {
       inputSidebarDividerSubtle,
       inputSidebarDividerNone
     } = controls;
+    const statusLiveEl = byId<HTMLElement>('admin-status-live');
+    const statusEl = byId<HTMLElement>('admin-status');
 
     const getNavRows = (): HTMLElement[] => queryAll<HTMLElement>(root, '[data-nav-id]');
     const deepClone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -394,7 +399,7 @@ if (!root) {
     let isValidating = false;
     let isConsoleLocked = false;
     let isAdminActionsNearViewport = false;
-    const statusTargets = [statusEl, statusInlineEl];
+    const statusTargets = [statusEl, statusInlineEl].filter((target): target is HTMLElement => target !== null);
 
     const scrollIntoViewWithOffset = (element: HTMLElement): void => {
       const top = element.getBoundingClientRect().top + window.scrollY - 24;
@@ -425,9 +430,10 @@ if (!root) {
     const STATUS_INVALID_SETTINGS = '配置损坏';
 
     const setStatus = (state: string, message: string, options: { announce?: boolean } = {}): void => {
-      const currentState = statusEl.dataset.state ?? '';
-      const currentMessage = statusEl.textContent?.trim() || '';
-      if (currentState !== state || currentMessage !== message) {
+      const primaryStatusTarget = statusTargets[0] ?? null;
+      const currentState = primaryStatusTarget?.dataset.state ?? '';
+      const currentMessage = primaryStatusTarget?.textContent?.trim() || '';
+      if (statusTargets.length > 0 && (currentState !== state || currentMessage !== message)) {
         statusTargets.forEach((target) => {
           target.dataset.state = state;
           target.textContent = message;
@@ -435,6 +441,7 @@ if (!root) {
       }
 
       if (options.announce === false) return;
+      if (!statusLiveEl) return;
 
       const liveState = statusLiveEl.dataset.state ?? '';
       const liveMessage = statusLiveEl.textContent?.trim() || '';
@@ -444,8 +451,9 @@ if (!root) {
     };
 
     const syncDirtyStatus = (next: boolean): void => {
-      const currentState = statusEl.dataset.state;
-      const currentMessage = statusEl.textContent?.trim() || '';
+      const primaryStatusTarget = statusTargets[0] ?? null;
+      const currentState = primaryStatusTarget?.dataset.state;
+      const currentMessage = primaryStatusTarget?.textContent?.trim() || '';
 
       if (next) {
         if ((currentState === 'ready' || currentState === 'ok') && currentMessage !== STATUS_WAITING_SAVE) {
@@ -1175,6 +1183,42 @@ if (!root) {
         setSaving(false);
       }
     });
+
+    document.addEventListener(
+      'click',
+      (event) => {
+        if (!isDirty) return;
+        if (!(event.target instanceof Element)) return;
+
+        const anchor = event.target.closest('a[href]');
+        if (!(anchor instanceof HTMLAnchorElement)) return;
+
+        if (
+          !shouldGuardAdminNavigation({
+            isDirty,
+            currentUrl: window.location.href,
+            nextUrl: anchor.href,
+            button: event.button,
+            metaKey: event.metaKey,
+            ctrlKey: event.ctrlKey,
+            shiftKey: event.shiftKey,
+            altKey: event.altKey,
+            target: anchor.target,
+            download: anchor.hasAttribute('download')
+          })
+        ) {
+          return;
+        }
+
+        const confirmed = window.confirm('当前有未保存更改，确定要离开此页吗？');
+        if (confirmed) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        setStatus('warn', '已取消页面切换，请先保存或重置当前更改', { announce: false });
+      },
+      true
+    );
 
     window.addEventListener('beforeunload', (event) => {
       if (!isDirty) return;

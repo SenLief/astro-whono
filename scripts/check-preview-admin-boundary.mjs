@@ -90,25 +90,50 @@ const createJsonRequestInit = (baseUrl, payload) => ({
   body: JSON.stringify(payload)
 });
 
-const assertAdminDevBootstrapSafe = (response) => {
-  expect(response.status === 200, `Dev GET /admin/ returned ${response.status}`);
+const assertAdminOverviewShell = (label, response) => {
+  expect(response.status === 200, `${label} returned ${response.status}`);
   expect(
     response.contentType.toLowerCase().includes('text/html'),
-    'Dev GET /admin/ did not return HTML'
+    `${label} did not return HTML`
   );
-  expect(response.body.includes('data-admin-root'), 'Dev /admin/ lost the admin console shell');
-  expect(response.body.includes('id="admin-bootstrap"'), 'Dev /admin/ is missing the bootstrap container');
+  expect(response.body.includes('Admin Console'), `${label} is missing the admin overview heading`);
+  expect(response.body.includes('/admin/theme/'), `${label} is missing the theme route link`);
+  expect(!response.body.includes('data-admin-root'), `${label} should not mount the theme form root`);
+  expect(!response.body.includes('id="admin-bootstrap"'), `${label} should not emit theme bootstrap payload`);
+};
+
+const assertReadonlyAdminThemeShell = (label, response) => {
+  expect(response.status === 200, `${label} returned ${response.status}`);
+  expect(
+    response.contentType.toLowerCase().includes('text/html'),
+    `${label} did not return HTML`
+  );
+  expect(response.body.includes('Theme Console'), `${label} is missing the theme heading`);
+  expect(response.body.includes('/admin/'), `${label} is missing the overview route link`);
+  expect(!response.body.includes('data-admin-root'), `${label} should stay readonly outside dev`);
+  expect(!response.body.includes('id="admin-bootstrap"'), `${label} should not emit theme bootstrap payload outside dev`);
+};
+
+const assertAdminThemeDevBootstrapSafe = (label, response) => {
+  expect(response.status === 200, `${label} returned ${response.status}`);
+  expect(
+    response.contentType.toLowerCase().includes('text/html'),
+    `${label} did not return HTML`
+  );
+  expect(response.body.includes('Theme Console'), `${label} is missing the theme heading`);
+  expect(response.body.includes('data-admin-root'), `${label} lost the admin console shell`);
+  expect(response.body.includes('id="admin-bootstrap"'), `${label} is missing the bootstrap container`);
   expect(
     response.body.includes(ADMIN_BOOTSTRAP_XSS_SENTINEL),
-    'Dev /admin/ did not include the stored sentinel in bootstrap output'
+    `${label} did not include the stored sentinel in bootstrap output`
   );
   expect(
     !response.body.includes(ADMIN_BOOTSTRAP_BREAKOUT_PAYLOAD),
-    'Dev /admin/ bootstrap still emits raw </script> breakout payload'
+    `${label} bootstrap still emits raw </script> breakout payload`
   );
   expect(
     !response.body.includes(`<script>window.${ADMIN_BOOTSTRAP_XSS_SENTINEL}=1</script>`),
-    'Dev /admin/ bootstrap still emits an executable sentinel script tag'
+    `${label} bootstrap still emits an executable sentinel script tag`
   );
 };
 
@@ -146,6 +171,8 @@ export const runPreviewAdminBoundaryCheck = async () => {
   try {
     await waitForHttpReady(`${baseUrl}/`);
 
+    const adminOverviewResponse = await request(baseUrl, '/admin/');
+    const adminThemeResponse = await request(baseUrl, '/admin/theme/');
     const getResponse = await request(baseUrl, '/api/admin/settings/');
     const postResponse = await request(baseUrl, '/api/admin/settings/', {
       method: 'POST',
@@ -156,6 +183,8 @@ export const runPreviewAdminBoundaryCheck = async () => {
       body: JSON.stringify({ revision: 'invalid', settings: {} })
     });
 
+    assertAdminOverviewShell('Preview GET /admin/', adminOverviewResponse);
+    assertReadonlyAdminThemeShell('Preview GET /admin/theme/', adminThemeResponse);
     assertAdminSettingsStaticResponse('GET /api/admin/settings/', getResponse);
     assertAdminSettingsStaticResponse('POST /api/admin/settings/', postResponse);
     console.log('Preview admin settings boundary check passed.');
@@ -257,8 +286,10 @@ export const runDevAdminSettingsSmokeCheck = async () => {
       'Dev POST /api/admin/settings/ wrote unexpected ui.json content'
     );
 
-    const adminPageResponse = await request(baseUrl, '/admin/');
-    assertAdminDevBootstrapSafe(adminPageResponse);
+    const adminOverviewResponse = await request(baseUrl, '/admin/');
+    const adminThemeResponse = await request(baseUrl, '/admin/theme/');
+    assertAdminOverviewShell('Dev GET /admin/', adminOverviewResponse);
+    assertAdminThemeDevBootstrapSafe('Dev GET /admin/theme/', adminThemeResponse);
 
     console.log('Dev admin settings smoke check passed.');
   } catch (error) {
