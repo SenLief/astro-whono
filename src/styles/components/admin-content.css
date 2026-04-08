@@ -54,8 +54,8 @@
 .admin-content-inspector__note {
   margin: 0;
   color: var(--faint);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--admin-text-sm);
+  line-height: var(--admin-leading-body);
 }
 
 .admin-content-toolbar {
@@ -160,8 +160,8 @@
   flex-wrap: wrap;
   gap: 6px;
   color: var(--faint);
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  font-size: var(--admin-text-2xs);
+  letter-spacing: var(--admin-tracking-xwide);
   text-transform: uppercase;
 }
 
@@ -203,20 +203,20 @@
 
 .admin-content-item__fact dt {
   color: var(--faint);
-  font-size: 11px;
-  letter-spacing: 0.06em;
+  font-size: var(--admin-text-2xs);
+  letter-spacing: var(--admin-tracking-wide);
   text-transform: uppercase;
 }
 
 .admin-content-item__fact dd {
   min-width: 0;
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--admin-text-sm);
   word-break: break-word;
 }
 
 .admin-content-item__fact dd code {
-  font-size: 12px;
+  font-size: var(--admin-text-xs);
 }
 
 .admin-content-item__excerpt,
@@ -224,7 +224,7 @@
 .admin-content-empty {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--admin-text-base);
   line-height: 1.7;
 }
 

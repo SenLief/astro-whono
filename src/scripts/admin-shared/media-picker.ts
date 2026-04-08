@@ -1,38 +1,23 @@
+import {
+  fetchAdminMediaJson,
+  formatAdminMediaMetaSummary,
+  parseAdminMediaListResponse,
+  parseAdminMediaMetaResponse,
+  type AdminMediaClientItem,
+  type AdminMediaClientMeta
+} from './media-client';
+
 export type AdminMediaPickerField =
   | 'bits.images'
   | 'home.heroImageSrc'
   | 'page.bits.defaultAuthor.avatar';
-
-export type AdminMediaPickerItem = {
-  path: string;
-  value: string;
-  origin: 'public' | 'src/assets' | 'src/content';
-  fileName: string;
-  width: number | null;
-  height: number | null;
-  size: number | null;
-  mimeType: string | null;
-  previewSrc: string | null;
-};
-
-export type AdminMediaPickerMeta = {
-  kind: 'local' | 'remote';
-  path: string | null;
-  value: string;
-  origin: 'public' | 'src/assets' | 'src/content' | null;
-  width: number | null;
-  height: number | null;
-  size: number | null;
-  mimeType: string | null;
-  previewSrc: string | null;
-};
 
 type AdminMediaPickerOpenOptions = {
   field: AdminMediaPickerField;
   title: string;
   description?: string;
   query?: string;
-  onSelect: (item: AdminMediaPickerItem) => void;
+  onSelect: (item: AdminMediaClientItem) => void;
 };
 
 export type AdminMediaPickerController = {
@@ -42,84 +27,7 @@ export type AdminMediaPickerController = {
     field: AdminMediaPickerField;
     value?: string;
     path?: string;
-  }) => Promise<AdminMediaPickerMeta>;
-};
-
-type AdminMediaListResponse = {
-  items: AdminMediaPickerItem[];
-  page: number;
-  totalPages: number;
-  totalCount: number;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const formatBytes = (size: number | null): string => {
-  if (!size || size <= 0) return '大小未知';
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(size < 10 * 1024 ? 1 : 0)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-const getOriginLabel = (origin: AdminMediaPickerMeta['origin']): string => {
-  if (origin === 'public') return '公开资源';
-  if (origin === 'src/assets') return '站点素材';
-  if (origin === 'src/content') return '文章附件';
-  return '本地资源';
-};
-
-export const formatAdminMediaMetaSummary = (meta: Pick<AdminMediaPickerMeta, 'kind' | 'origin' | 'width' | 'height' | 'size'>): string => {
-  if (meta.kind === 'remote') {
-    return '远程图片；不自动读取本地尺寸';
-  }
-
-  const originLabel = getOriginLabel(meta.origin);
-  const sizeLabel = formatBytes(meta.size);
-  if (meta.width && meta.height) {
-    return `${originLabel} · ${meta.width}×${meta.height} · ${sizeLabel}`;
-  }
-  return `${originLabel} · 尺寸未知 · ${sizeLabel}`;
-};
-
-const getResponseErrors = (payload: unknown): string[] =>
-  isRecord(payload) && Array.isArray(payload.errors)
-    ? payload.errors.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-    : [];
-
-const parseListResponse = (payload: unknown): AdminMediaListResponse => {
-  if (!isRecord(payload) || !isRecord(payload.result) || !Array.isArray(payload.result.items)) {
-    throw new Error('媒体列表响应缺少 result.items');
-  }
-
-  return {
-    items: payload.result.items.filter((item): item is AdminMediaPickerItem => isRecord(item) && typeof item.value === 'string'),
-    page: typeof payload.result.page === 'number' ? payload.result.page : 1,
-    totalPages: typeof payload.result.totalPages === 'number' ? payload.result.totalPages : 1,
-    totalCount: typeof payload.result.totalCount === 'number' ? payload.result.totalCount : 0
-  };
-};
-
-const parseMetaResponse = (payload: unknown): AdminMediaPickerMeta => {
-  if (!isRecord(payload) || !isRecord(payload.result) || typeof payload.result.kind !== 'string') {
-    throw new Error('媒体元数据响应缺少 result');
-  }
-
-  return payload.result as AdminMediaPickerMeta;
-};
-
-const fetchJson = async (url: string): Promise<unknown> => {
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    cache: 'no-store'
-  });
-  const payload = (await response.json().catch(() => null)) as unknown;
-  if (!response.ok || !isRecord(payload) || payload.ok !== true) {
-    const errors = getResponseErrors(payload);
-    throw new Error(errors[0] ?? '媒体接口请求失败');
-  }
-  return payload;
+  }) => Promise<AdminMediaClientMeta>;
 };
 
 export const createAdminMediaPicker = (root: ParentNode = document): AdminMediaPickerController | null => {
@@ -169,7 +77,7 @@ export const createAdminMediaPicker = (root: ParentNode = document): AdminMediaP
     statusEl.textContent = text;
   };
 
-  const renderItems = (items: readonly AdminMediaPickerItem[], totalCount: number) => {
+  const renderItems = (items: readonly AdminMediaClientItem[], totalCount: number) => {
     resultsEl.replaceChildren();
     if (!items.length) {
       const empty = document.createElement('li');
@@ -251,10 +159,10 @@ export const createAdminMediaPicker = (root: ParentNode = document): AdminMediaP
     if (query) params.set('q', query);
 
     try {
-      const payload = await fetchJson(`${listEndpoint}?${params.toString()}`);
+      const payload = await fetchAdminMediaJson(`${listEndpoint}?${params.toString()}`, '媒体列表请求失败');
       if (token !== requestToken) return;
 
-      const result = parseListResponse(payload);
+      const result = parseAdminMediaListResponse(payload);
       currentPage = result.page;
       totalPages = result.totalPages;
       syncPager();
@@ -300,7 +208,7 @@ export const createAdminMediaPicker = (root: ParentNode = document): AdminMediaP
     field: AdminMediaPickerField;
     value?: string;
     path?: string;
-  }): Promise<AdminMediaPickerMeta> => {
+  }): Promise<AdminMediaClientMeta> => {
     const params = new URLSearchParams();
     if (path?.trim()) {
       params.set('path', path.trim());
@@ -308,8 +216,8 @@ export const createAdminMediaPicker = (root: ParentNode = document): AdminMediaP
       params.set('field', field);
       params.set('value', value?.trim() ?? '');
     }
-    const payload = await fetchJson(`${metaEndpoint}?${params.toString()}`);
-    return parseMetaResponse(payload);
+    const payload = await fetchAdminMediaJson(`${metaEndpoint}?${params.toString()}`, '媒体元数据请求失败');
+    return parseAdminMediaMetaResponse(payload);
   };
 
   closeBtn.addEventListener('click', close);

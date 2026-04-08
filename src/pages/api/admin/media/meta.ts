@@ -1,9 +1,9 @@
 import type { APIRoute } from 'astro';
 import {
   AdminMediaError,
-  getAdminMediaMeta,
-  isAdminMediaFieldContext
-} from '../../../../lib/admin-console/media-shared';
+  getAdminMediaMetaRequest
+} from '../../../../lib/admin-console/media-params';
+import { getAdminMediaMeta } from '../../../../lib/admin-console/media-shared';
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -18,23 +18,7 @@ export const GET: APIRoute = async ({ url }) => {
   }
 
   try {
-    const rawField = (url.searchParams.get('field') ?? '').trim();
-    const rawValue = (url.searchParams.get('value') ?? '').trim();
-    const rawPath = (url.searchParams.get('path') ?? '').trim();
-
-    const request = rawPath
-      ? { path: rawPath }
-      : (() => {
-          if (!isAdminMediaFieldContext(rawField)) {
-            throw new AdminMediaError('field 参数非法，无法读取媒体元数据');
-          }
-
-          return {
-            field: rawField,
-            value: rawValue
-          };
-        })();
-
+    const request = getAdminMediaMetaRequest(url.searchParams);
     const result = await getAdminMediaMeta(request);
 
     return new Response(JSON.stringify({ ok: true, result }, null, 2), {

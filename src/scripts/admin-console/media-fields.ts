@@ -1,6 +1,6 @@
 import { createWithBase } from '../../utils/format';
+import { formatAdminMediaMetaSummary } from '../admin-shared/media-client';
 import type { AdminMediaPickerController, AdminMediaPickerField } from '../admin-shared/media-picker';
-import { formatAdminMediaMetaSummary } from '../admin-shared/media-picker';
 
 type StatusSetter = (
   state: string,

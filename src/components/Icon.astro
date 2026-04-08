@@ -8,14 +8,17 @@ type IconName =
   | 'sun'
   | 'search'
   | 'refresh'
+  | 'copy'
   | 'pen'
   | 'bold'
   | 'italic'
   | 'code'
   | 'quote'
   | 'list'
+  | 'grid-tiles'
   | 'tag'
   | 'link'
+  | 'branch-nodes'
   | 'paragraph'
   | 'map-pin'
   | 'eye'
@@ -23,6 +26,7 @@ type IconName =
   | 'chevron-down'
   | 'chevron-up'
   | 'user-circle'
+  | 'x-mark'
   | 'github'
   | 'x'
   | 'x-twitter'
@@ -357,6 +361,27 @@ const socialIconBody = Object.prototype.hasOwnProperty.call(socialIconBodies, no
   </svg>
 )}
 
+{name === 'copy' && (
+  <svg
+    class={className}
+    width={iconSize}
+    height={iconSize}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden={ariaHidden}
+    aria-label={ariaLabel}
+    role={role}
+    focusable="false"
+  >
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+)}
+
 {name === 'pen' && (
   <svg
     class={className}
@@ -513,6 +538,29 @@ const socialIconBody = Object.prototype.hasOwnProperty.call(socialIconBodies, no
   </svg>
 )}
 
+{name === 'grid-tiles' && (
+  <svg
+    class={className}
+    width={iconSize}
+    height={iconSize}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden={ariaHidden}
+    aria-label={ariaLabel}
+    role={role}
+    focusable="false"
+  >
+    <rect x="3.5" y="4" width="7" height="6.5" rx="1.4" />
+    <rect x="13.5" y="4" width="7" height="6.5" rx="1.4" />
+    <rect x="3.5" y="13.5" width="7" height="6.5" rx="1.4" />
+    <rect x="13.5" y="13.5" width="7" height="6.5" rx="1.4" />
+  </svg>
+)}
+
 {name === 'link' && (
   <svg
     class={className}
@@ -531,6 +579,32 @@ const socialIconBody = Object.prototype.hasOwnProperty.call(socialIconBodies, no
   >
     <path d="M10 13a5 5 0 0 1 7 0l1 1a5 5 0 0 1-7 7l-1-1" />
     <path d="M14 11a5 5 0 0 1-7 0l-1-1a5 5 0 0 1 7-7l1 1" />
+  </svg>
+)}
+
+{name === 'branch-nodes' && (
+  <svg
+    class={className}
+    width={iconSize}
+    height={iconSize}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden={ariaHidden}
+    aria-label={ariaLabel}
+    role={role}
+    focusable="false"
+  >
+    <rect x="3.5" y="9.5" width="5" height="5" rx="1.4" />
+    <rect x="15.5" y="4.5" width="5" height="5" rx="1.4" />
+    <rect x="15.5" y="14.5" width="5" height="5" rx="1.4" />
+    <path d="M8.5 12h4" />
+    <path d="M12.5 7v10" />
+    <path d="M12.5 7h3" />
+    <path d="M12.5 17h3" />
   </svg>
 )}
 
@@ -664,6 +738,27 @@ const socialIconBody = Object.prototype.hasOwnProperty.call(socialIconBodies, no
   >
     <circle cx="12" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.6" />
     <path d="M4.5 20c1.6-3 5-4.6 7.5-4.6s5.9 1.6 7.5 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+)}
+
+{name === 'x-mark' && (
+  <svg
+    class={className}
+    width={iconSize}
+    height={iconSize}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden={ariaHidden}
+    aria-label={ariaLabel}
+    role={role}
+    focusable="false"
+  >
+    <path d="M7 7l10 10" />
+    <path d="M17 7L7 17" />
   </svg>
 )}
 

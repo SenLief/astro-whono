@@ -1,21 +1,39 @@
 import {
-  formatAdminMediaMetaSummary,
-  type AdminMediaPickerMeta
-} from '../admin-shared/media-picker';
+  fetchAdminMediaJson,
+  formatAdminMediaBytes,
+  isNullableNumber,
+  isNullableString,
+  isRecord,
+  parseAdminMediaMetaResponse,
+  type AdminMediaClientMeta
+} from '../admin-shared/media-client';
+import {
+  ADMIN_MEDIA_DEFAULT_LIST_LIMIT,
+  ADMIN_MEDIA_SCOPE_LABELS,
+  isAdminMediaBrowseGroup,
+  isAdminMediaOrigin,
+  isAdminMediaScopeKey,
+  type AdminMediaBrowseGroup,
+  type AdminMediaOrigin,
+  type AdminMediaScopeKey
+} from '../../lib/admin-console/media-contract';
+import {
+  buildAdminMediaBrowseGroupOptions,
+  buildAdminMediaScopeItems,
+  matchesAdminMediaQuery,
+  normalizeAdminMediaBrowseGroup,
+  normalizeAdminMediaBrowseSubgroup,
+  paginateAdminMediaItems,
+  resolveAdminMediaBrowsePage,
+  type AdminMediaBrowseFilterOption,
+  type AdminMediaScopeIndex
+} from '../../lib/admin-console/media-browse';
 
-type AdminMediaBrowseGroup = 'all' | 'essay' | 'bits' | 'memo' | 'assets' | 'pages' | 'uncategorized';
-type AdminMediaScope = '' | 'recent';
-
-type AdminMediaFilterOption = {
-  value: string;
-  label: string;
-  count: number;
-  hidden?: boolean;
-};
+type AdminMediaScope = '' | AdminMediaScopeKey;
 
 type AdminMediaBrowseItem = {
   path: string;
-  origin: 'public' | 'src/assets' | 'src/content';
+  origin: AdminMediaOrigin;
   fileName: string;
   owner: string | null;
   ownerLabel: string | null;
@@ -46,17 +64,15 @@ type AdminMediaBootstrap = {
     page: number;
   };
   browseIndex: AdminMediaBrowseItem[] | null;
-  scopeIndex: {
-    recent: string[];
-  };
+  scopeIndex: AdminMediaScopeIndex;
   didRefresh: boolean;
 };
 
 type AdminMediaListResponse = {
   group: string;
   subgroup: string;
-  groupOptions: AdminMediaFilterOption[];
-  subgroupOptions: AdminMediaFilterOption[];
+  groupOptions: AdminMediaBrowseFilterOption[];
+  subgroupOptions: AdminMediaBrowseFilterOption[];
   items: AdminMediaListItem[];
   page: number;
   totalPages: number;
@@ -74,35 +90,11 @@ type AdminMediaState = {
 const root = document.querySelector<HTMLElement>('[data-admin-media-root]');
 const DEFAULT_GROUP: AdminMediaBrowseGroup = 'all';
 const DEFAULT_SCOPE: AdminMediaScope = '';
-const PAGE_SIZE = 24;
+const PAGE_SIZE = ADMIN_MEDIA_DEFAULT_LIST_LIMIT;
 const LARGE_FILE_THRESHOLD = 500 * 1024;
-const BROWSE_GROUP_ORDER: readonly AdminMediaBrowseGroup[] = [
-  'all',
-  'essay',
-  'bits',
-  'memo',
-  'assets',
-  'pages',
-  'uncategorized'
-];
-const BROWSE_GROUP_LABELS: Record<AdminMediaBrowseGroup, string> = {
-  all: '全部',
-  essay: '随笔',
-  bits: 'Bits',
-  memo: 'Memo',
-  assets: '配置素材',
-  pages: '公共页面图',
-  uncategorized: '未归类'
-};
-const SCOPE_LABELS: Record<Exclude<AdminMediaScope, ''>, string> = {
-  recent: '最近修改'
-};
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const isNullableString = (value: unknown): value is string | null => value === null || typeof value === 'string';
-const isNullableNumber = (value: unknown): value is number | null => value === null || typeof value === 'number';
 const byId = <T extends HTMLElement>(id: string): T | null => document.getElementById(id) as T | null;
+const iconLibraryEl = byId<HTMLDivElement>('admin-media-icon-library');
+const iconMarkupCache = new Map<string, string>();
 
 const escapeHtml = (value: string): string =>
   value
@@ -115,17 +107,14 @@ const escapeHtml = (value: string): string =>
 const parsePositiveInteger = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : fallback;
 
-const formatBytes = (size: number | null): string => {
-  if (!size || size <= 0) return '大小未知';
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(size < 10 * 1024 ? 1 : 0)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-};
+const getIconMarkup = (name: string): string => {
+  const cached = iconMarkupCache.get(name);
+  if (cached !== undefined) return cached;
 
-const getResponseErrors = (payload: unknown): string[] =>
-  isRecord(payload) && Array.isArray(payload.errors)
-    ? payload.errors.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-    : [];
+  const markup = iconLibraryEl?.querySelector<HTMLElement>(`[data-icon="${name}"]`)?.innerHTML.trim() ?? '';
+  iconMarkupCache.set(name, markup);
+  return markup;
+};
 
 const getOriginBadgeLabel = (origin: AdminMediaBrowseItem['origin']): string => {
   if (origin === 'public') return '公开资源';
@@ -135,83 +124,6 @@ const getOriginBadgeLabel = (origin: AdminMediaBrowseItem['origin']): string => 
 
 const getFilterOptionCount = (options: readonly AdminMediaFilterOption[]): number =>
   options.reduce((total, option) => total + option.count, 0);
-
-const isAdminMediaBrowseGroup = (value: string): value is AdminMediaBrowseGroup =>
-  BROWSE_GROUP_ORDER.includes(value as AdminMediaBrowseGroup);
-
-const isAdminMediaScope = (value: string): value is Exclude<AdminMediaScope, ''> =>
-  value in SCOPE_LABELS;
-
-const matchesBrowseQuery = (item: AdminMediaBrowseItem, query: string): boolean => {
-  if (!query) return true;
-  const haystack = `${item.path} ${item.fileName} ${item.owner ?? ''} ${item.ownerLabel ?? ''}`.toLowerCase();
-  return haystack.includes(query);
-};
-
-const buildGroupOptions = (items: readonly AdminMediaBrowseItem[]): AdminMediaFilterOption[] => {
-  const counts = items.reduce((map, item) => {
-    map.set(item.browseGroup, (map.get(item.browseGroup) ?? 0) + 1);
-    return map;
-  }, new Map<Exclude<AdminMediaBrowseGroup, 'all'>, number>());
-
-  return BROWSE_GROUP_ORDER.map((group) => ({
-    value: group,
-    label: BROWSE_GROUP_LABELS[group],
-    count: group === 'all' ? items.length : (counts.get(group) ?? 0),
-    hidden: group === 'uncategorized'
-  }));
-};
-
-const buildSubgroupOptions = (
-  group: Exclude<AdminMediaBrowseGroup, 'all'>,
-  items: readonly AdminMediaBrowseItem[]
-): AdminMediaFilterOption[] => {
-  const subgroupMap = items.reduce((map, item) => {
-    if (item.browseGroup !== group || !item.browseSubgroup) return map;
-    const current = map.get(item.browseSubgroup);
-    if (current) {
-      current.count += 1;
-      return map;
-    }
-
-    map.set(item.browseSubgroup, {
-      value: item.browseSubgroup,
-      label: item.browseSubgroupLabel ?? item.browseSubgroup,
-      count: 1
-    });
-    return map;
-  }, new Map<string, AdminMediaFilterOption>());
-
-  return Array.from(subgroupMap.values()).sort((left, right) => {
-    if (/^(?:19|20)\d{2}$/.test(left.value) && /^(?:19|20)\d{2}$/.test(right.value)) {
-      return Number.parseInt(right.value, 10) - Number.parseInt(left.value, 10);
-    }
-    return left.label.localeCompare(right.label, 'zh-CN');
-  });
-};
-
-const buildScopeItems = (
-  scope: Exclude<AdminMediaScope, ''>,
-  browseIndex: readonly AdminMediaBrowseItem[],
-  scopeIndex: { recent: string[] }
-): AdminMediaBrowseItem[] => {
-  if (scope !== 'recent') return [];
-
-  const orderMap = scopeIndex.recent.reduce((map, assetPath, index) => {
-    if (!map.has(assetPath)) {
-      map.set(assetPath, index);
-    }
-    return map;
-  }, new Map<string, number>());
-
-  return browseIndex
-    .filter((item) => orderMap.has(item.path))
-    .sort((left, right) => {
-      const leftIndex = orderMap.get(left.path) ?? Number.MAX_SAFE_INTEGER;
-      const rightIndex = orderMap.get(right.path) ?? Number.MAX_SAFE_INTEGER;
-      return leftIndex - rightIndex;
-    });
-};
 
 const toBrowseItem = (item: AdminMediaListItem): AdminMediaBrowseItem => ({
   path: item.path,
@@ -227,7 +139,7 @@ const toBrowseItem = (item: AdminMediaListItem): AdminMediaBrowseItem => ({
   previewSrc: item.previewSrc
 });
 
-const toCachedMeta = (item: AdminMediaListItem): AdminMediaPickerMeta => ({
+const toCachedMeta = (item: AdminMediaListItem): AdminMediaClientMeta => ({
   kind: 'local',
   path: item.path,
   value: item.value,
@@ -238,6 +150,8 @@ const toCachedMeta = (item: AdminMediaListItem): AdminMediaPickerMeta => ({
   mimeType: item.mimeType,
   previewSrc: item.previewSrc
 });
+
+type AdminMediaFilterOption = AdminMediaBrowseFilterOption;
 
 const parseFilterOptions = (payload: unknown): AdminMediaFilterOption[] => {
   if (!Array.isArray(payload)) return [];
@@ -254,11 +168,12 @@ const parseFilterOptions = (payload: unknown): AdminMediaFilterOption[] => {
 const isBrowseItem = (item: unknown): item is AdminMediaBrowseItem =>
   isRecord(item)
   && typeof item.path === 'string'
-  && typeof item.origin === 'string'
+  && isAdminMediaOrigin(item.origin)
   && typeof item.fileName === 'string'
   && isNullableString(item.owner)
   && isNullableString(item.ownerLabel)
-  && typeof item.browseGroup === 'string'
+  && isAdminMediaBrowseGroup(item.browseGroup)
+  && item.browseGroup !== DEFAULT_GROUP
   && typeof item.browseGroupLabel === 'string'
   && typeof item.browseSubgroup === 'string'
   && isNullableString(item.browseSubgroupLabel)
@@ -268,11 +183,12 @@ const isBrowseItem = (item: unknown): item is AdminMediaBrowseItem =>
 const isListItem = (item: unknown): item is AdminMediaListItem =>
   isRecord(item)
   && typeof item.path === 'string'
-  && typeof item.origin === 'string'
+  && isAdminMediaOrigin(item.origin)
   && typeof item.fileName === 'string'
   && isNullableString(item.owner)
   && isNullableString(item.ownerLabel)
-  && typeof item.browseGroup === 'string'
+  && isAdminMediaBrowseGroup(item.browseGroup)
+  && item.browseGroup !== DEFAULT_GROUP
   && typeof item.browseGroupLabel === 'string'
   && typeof item.browseSubgroup === 'string'
   && isNullableString(item.browseSubgroupLabel)
@@ -289,11 +205,15 @@ const parseListResult = (result: unknown): AdminMediaListResponse => {
     throw new Error('媒体列表结果格式无效');
   }
 
+  const normalizedGroup = typeof result.group === 'string'
+    ? normalizeAdminMediaBrowseGroup(result.group)
+    : '';
+
   return {
-    group: typeof result.group === 'string' && result.group.trim().length > 0
-      ? result.group.trim().toLowerCase()
-      : DEFAULT_GROUP,
-    subgroup: typeof result.subgroup === 'string' ? result.subgroup.trim() : '',
+    group: isAdminMediaBrowseGroup(normalizedGroup) ? normalizedGroup : DEFAULT_GROUP,
+    subgroup: typeof result.subgroup === 'string'
+      ? normalizeAdminMediaBrowseSubgroup(result.subgroup)
+      : '',
     groupOptions: parseFilterOptions(result.groupOptions),
     subgroupOptions: parseFilterOptions(result.subgroupOptions),
     items: result.items.filter(isListItem),
@@ -311,7 +231,7 @@ const parseBrowseIndex = (payload: unknown): AdminMediaBrowseItem[] | null => {
   return payload.filter(isBrowseItem);
 };
 
-const parseScopeIndex = (payload: unknown): { recent: string[] } | null => {
+const parseScopeIndex = (payload: unknown): AdminMediaScopeIndex | null => {
   if (payload == null) {
     return { recent: [] };
   }
@@ -341,19 +261,20 @@ const parseBootstrap = (text: string): AdminMediaBootstrap | null => {
     if (scopeIndex === null) {
       return null;
     }
-    const initialScope = typeof payload.initialState.scope === 'string'
-      && isAdminMediaScope(payload.initialState.scope.trim().toLowerCase())
-      ? 'recent'
-      : DEFAULT_SCOPE;
+    const normalizedScope = typeof payload.initialState.scope === 'string'
+      ? payload.initialState.scope.trim().toLowerCase()
+      : '';
+    const normalizedGroup = typeof payload.initialState.group === 'string'
+      ? normalizeAdminMediaBrowseGroup(payload.initialState.group)
+      : '';
+    const initialScope = isAdminMediaScopeKey(normalizedScope) ? normalizedScope : DEFAULT_SCOPE;
 
     return {
       listEndpoint: payload.listEndpoint,
       metaEndpoint: payload.metaEndpoint,
       initialState: {
         scope: initialScope,
-        group: typeof payload.initialState.group === 'string' && payload.initialState.group.trim().length > 0
-          ? payload.initialState.group.trim().toLowerCase()
-          : DEFAULT_GROUP,
+        group: isAdminMediaBrowseGroup(normalizedGroup) ? normalizedGroup : DEFAULT_GROUP,
         subgroup: typeof payload.initialState.subgroup === 'string' ? payload.initialState.subgroup.trim() : '',
         query: typeof payload.initialState.query === 'string' ? payload.initialState.query : '',
         page: parsePositiveInteger(payload.initialState.page, 1)
@@ -375,13 +296,6 @@ const parseListResponse = (payload: unknown): AdminMediaListResponse => {
   return parseListResult(payload.result);
 };
 
-const parseMetaResponse = (payload: unknown): AdminMediaPickerMeta => {
-  if (!isRecord(payload) || !isRecord(payload.result) || typeof payload.result.kind !== 'string') {
-    throw new Error('媒体元数据响应格式无效');
-  }
-  return payload.result as AdminMediaPickerMeta;
-};
-
 const fetchList = async (endpoint: string, state: AdminMediaState): Promise<AdminMediaListResponse> => {
   const params = new URLSearchParams({
     group: state.group || DEFAULT_GROUP,
@@ -395,29 +309,16 @@ const fetchList = async (endpoint: string, state: AdminMediaState): Promise<Admi
     params.set('q', state.query.trim());
   }
 
-  const response = await fetch(`${endpoint}?${params.toString()}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    cache: 'no-store'
-  });
-  const payload = (await response.json().catch(() => null)) as unknown;
-  if (!response.ok) {
-    throw new Error(getResponseErrors(payload)[0] ?? `媒体列表请求失败（HTTP ${response.status}）`);
-  }
+  const payload = await fetchAdminMediaJson(`${endpoint}?${params.toString()}`, '媒体列表请求失败');
   return parseListResponse(payload);
 };
 
-const fetchMetaByPath = async (endpoint: string, assetPath: string): Promise<AdminMediaPickerMeta> => {
-  const response = await fetch(`${endpoint}?${new URLSearchParams({ path: assetPath }).toString()}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    cache: 'no-store'
-  });
-  const payload = (await response.json().catch(() => null)) as unknown;
-  if (!response.ok) {
-    throw new Error(getResponseErrors(payload)[0] ?? `媒体元数据请求失败（HTTP ${response.status}）`);
-  }
-  return parseMetaResponse(payload);
+const fetchMetaByPath = async (endpoint: string, assetPath: string): Promise<AdminMediaClientMeta> => {
+  const payload = await fetchAdminMediaJson(
+    `${endpoint}?${new URLSearchParams({ path: assetPath }).toString()}`,
+    '媒体元数据请求失败'
+  );
+  return parseAdminMediaMetaResponse(payload);
 };
 
 const updateUrl = (state: AdminMediaState) => {
@@ -557,7 +458,7 @@ if (root) {
       let currentSubgroupOptions: AdminMediaFilterOption[] = [];
       let selectedPath: string | null = null;
       let showHiddenGroups = bootstrap.initialState.group === 'uncategorized';
-      const detailMetaCache = new Map<string, AdminMediaPickerMeta>();
+      const detailMetaCache = new Map<string, AdminMediaClientMeta>();
       const detailMetaErrors = new Map<string, string>();
       const detailMetaPending = new Set<string>();
       let currentState: AdminMediaState = {
@@ -593,7 +494,7 @@ if (root) {
           return dimensions;
         }
 
-        return `${dimensions} · ${formatBytes(detailMeta.size)}`;
+        return `${dimensions} · ${formatAdminMediaBytes(detailMeta.size)}`;
       };
 
       const createChipButton = (
@@ -743,21 +644,73 @@ if (root) {
                 >
                   <span class="admin-media-browser__thumb">
                     ${item.previewSrc
-                      ? `<img src="${escapeHtml(item.previewSrc)}" alt="" loading="lazy" decoding="async" />`
-                      : '<span class="admin-media-browser__thumb-fallback">暂无预览</span>'}
+                ? `<img src="${escapeHtml(item.previewSrc)}" alt="" loading="lazy" decoding="async" />`
+                : '<span class="admin-media-browser__thumb-fallback">暂无预览</span>'}
                     ${overlayMeta
-                      ? `
+                ? `
                         <span class="admin-media-browser__thumb-overlay" aria-hidden="true">
                           <span class="admin-media-browser__thumb-meta">${escapeHtml(overlayMeta)}</span>
                         </span>
                       `
-                      : ''}
+                : ''}
                   </span>
                 </button>
               </li>
             `;
           })
           .join('');
+      };
+
+      const getRenderedCard = (assetPath: string): HTMLButtonElement | null =>
+        Array.from(resultListEl.querySelectorAll<HTMLButtonElement>('[data-path]')).find(
+          (button) => button.dataset.path === assetPath
+        ) ?? null;
+
+      const syncRenderedSelection = (previousPath: string | null, nextPath: string | null) => {
+        if (previousPath) {
+          getRenderedCard(previousPath)?.classList.remove('admin-media-browser__card--active');
+        }
+        if (nextPath) {
+          getRenderedCard(nextPath)?.classList.add('admin-media-browser__card--active');
+        }
+      };
+
+      const syncRenderedCardMeta = (assetPath: string) => {
+        const item = currentItems.find((entry) => entry.path === assetPath);
+        if (!item) return;
+
+        const card = getRenderedCard(assetPath);
+        if (!(card instanceof HTMLButtonElement)) return;
+
+        const thumb = card.querySelector<HTMLElement>('.admin-media-browser__thumb');
+        if (!(thumb instanceof HTMLElement)) return;
+
+        const overlayMeta = getCardOverlayMetaText(item);
+        const overlay = thumb.querySelector<HTMLElement>('.admin-media-browser__thumb-overlay');
+        if (!overlayMeta) {
+          overlay?.remove();
+          return;
+        }
+
+        if (overlay instanceof HTMLElement) {
+          const metaEl = overlay.querySelector<HTMLElement>('.admin-media-browser__thumb-meta');
+          if (metaEl instanceof HTMLElement) {
+            metaEl.textContent = overlayMeta;
+            return;
+          }
+        }
+
+        const nextOverlay = document.createElement('span');
+        nextOverlay.className = 'admin-media-browser__thumb-overlay';
+        nextOverlay.setAttribute('aria-hidden', 'true');
+
+        const metaEl = document.createElement('span');
+        metaEl.className = 'admin-media-browser__thumb-meta';
+        metaEl.textContent = overlayMeta;
+
+        nextOverlay.append(metaEl);
+        overlay?.remove();
+        thumb.append(nextOverlay);
       };
 
       const renderDetail = () => {
@@ -771,27 +724,24 @@ if (root) {
         const detailMeta = detailMetaCache.get(item.path) ?? null;
         const detailError = detailMetaErrors.get(item.path) ?? null;
         const detailLoading = detailMetaPending.has(item.path);
-        const metaSummary = detailMeta
-          ? formatAdminMediaMetaSummary({
-              kind: detailMeta.kind,
-              origin: detailMeta.origin,
-              width: detailMeta.width,
-              height: detailMeta.height,
-              size: detailMeta.size
-            })
-          : detailLoading
-            ? `${getOriginBadgeLabel(item.origin)} · 正在读取尺寸与体积`
-            : detailError
-              ? `${getOriginBadgeLabel(item.origin)} · ${detailError}`
-              : `${getOriginBadgeLabel(item.origin)} · 待读取媒体信息`;
+
+        const dimensionsText = detailMeta?.width && detailMeta.height
+          ? `${detailMeta.width} × ${detailMeta.height}`
+          : detailLoading ? '正在读取…' : detailError ? '读取失败' : '未读取';
+        const sizeText = detailMeta
+          ? formatAdminMediaBytes(detailMeta.size)
+          : detailLoading ? '正在读取…' : detailError ? '读取失败' : '未读取';
+        const typeText = detailMeta?.mimeType
+          ?? (detailLoading ? '正在读取…' : detailError ? '读取失败' : '未读取');
+
         const detailBadges = [
           `<span class="admin-media-browser__badge admin-media-browser__origin-badge" data-origin="${escapeHtml(item.origin)}">${escapeHtml(getOriginBadgeLabel(item.origin))}</span>`,
-          `<span class="admin-media-browser__badge">${escapeHtml(item.browseGroupLabel)}</span>`,
-          item.browseSubgroupLabel
-            ? `<span class="admin-media-browser__badge">${escapeHtml(item.browseSubgroupLabel)}</span>`
+          item.ownerLabel
+            ? `<span class="admin-media-browser__badge">Owner: ${escapeHtml(item.ownerLabel)}</span>`
             : '',
-          item.ownerLabel && item.browseSubgroupLabel !== item.ownerLabel
-            ? `<span class="admin-media-browser__badge">${escapeHtml(item.ownerLabel)}</span>`
+          item.browseSubgroupLabel
+            && item.browseSubgroupLabel !== item.ownerLabel
+            ? `<span class="admin-media-browser__badge">${escapeHtml(item.browseSubgroupLabel)}</span>`
             : '',
           detailMeta?.size && detailMeta.size >= LARGE_FILE_THRESHOLD
             ? '<span class="admin-media-browser__badge">大文件</span>'
@@ -799,81 +749,91 @@ if (root) {
         ]
           .filter(Boolean)
           .join('');
-        const valueMarkup = item.preferredValue && item.preferredValue !== item.path
-          ? `
-              <div class="admin-media-browser__detail-field">
-                <p class="admin-media-browser__detail-label">可用值</p>
-                <code class="admin-media-browser__detail-code">${escapeHtml(item.preferredValue)}</code>
-              </div>
-            `
-          : '';
+
+        const copyIcon = getIconMarkup('copy');
+        const linkIcon = getIconMarkup('link');
+        const eyeIcon = getIconMarkup('eye');
+
+        const hasPreferredValue = item.preferredValue && item.preferredValue !== item.path;
+        const fieldValue = hasPreferredValue ? item.preferredValue! : item.path;
+        const fieldLabel = hasPreferredValue ? '可用值 (field-compatible)' : '文件路径';
+        const fieldCopyLabel = hasPreferredValue ? '可用值' : '文件路径';
+        const valueFieldMarkup = `
+          <div class="admin-media-browser__detail-field">
+            <h4 class="admin-media-browser__detail-label">${escapeHtml(fieldLabel)}</h4>
+            <div class="admin-media-browser__code-wrapper">
+              <code class="admin-media-browser__detail-code">${escapeHtml(fieldValue)}</code>
+              <button class="admin-media-copy-btn" type="button" data-action="copy-field-value" title="点击复制" aria-label="复制${escapeHtml(fieldCopyLabel)}">${copyIcon}</button>
+            </div>
+          </div>
+        `;
+
+        const markdownFieldMarkup = `
+          <div class="admin-media-browser__detail-field">
+            <h4 class="admin-media-browser__detail-label admin-media-browser__detail-label--disabled">Markdown 引用（待开发）</h4>
+            <div class="admin-media-browser__code-wrapper admin-media-browser__code-wrapper--disabled">
+              <code class="admin-media-browser__detail-code">—</code>
+            </div>
+          </div>
+        `;
+
+        const previewSrc = detailMeta?.previewSrc ?? item.previewSrc;
+        const triggerInlineCopyFeedback = (button: HTMLButtonElement, copyLabel: string) => {
+          const existingTimer = Number(button.dataset.feedbackTimer ?? '');
+          if (Number.isFinite(existingTimer) && existingTimer > 0) {
+            window.clearTimeout(existingTimer);
+          }
+
+          button.dataset.state = 'copied';
+          button.setAttribute('aria-label', `已复制${copyLabel}`);
+          button.setAttribute('title', `已复制${copyLabel}`);
+
+          const timer = window.setTimeout(() => {
+            if (!button.isConnected) return;
+            delete button.dataset.state;
+            delete button.dataset.feedbackTimer;
+            button.setAttribute('aria-label', `复制${copyLabel}`);
+            button.setAttribute('title', '点击复制');
+          }, 1100);
+
+          button.dataset.feedbackTimer = String(timer);
+        };
 
         detailEl.hidden = false;
         detailEl.innerHTML = `
           <div class="admin-media-browser__detail-layout">
             <div class="admin-media-browser__detail-media">
-              ${(detailMeta?.previewSrc ?? item.previewSrc)
-                ? `<img src="${escapeHtml(detailMeta?.previewSrc ?? item.previewSrc ?? '')}" alt="${escapeHtml(item.fileName)}" loading="eager" decoding="async" />`
-                : '<div class="admin-media-browser__detail-fallback">无预览</div>'}
+              ${previewSrc
+            ? `<img src="${escapeHtml(previewSrc)}" alt="${escapeHtml(item.fileName)}" loading="eager" decoding="async" />`
+            : '<div class="admin-media-browser__detail-fallback">无预览</div>'}
             </div>
 
             <div class="admin-media-browser__detail-body">
-              <div>
-                <p class="admin-overview-card__eyebrow">Detail</p>
-                <h2 class="admin-media-browser__detail-title">${escapeHtml(item.fileName)}</h2>
-                <p class="admin-media-browser__detail-meta">${escapeHtml(metaSummary)}</p>
+              <div class="admin-media-browser__detail-header">
+                <h3 class="admin-media-browser__detail-title">${escapeHtml(item.fileName)}</h3>
                 <div class="admin-media-browser__detail-badges">${detailBadges}</div>
               </div>
 
-              <div class="admin-media-browser__detail-field">
-                <p class="admin-media-browser__detail-label">文件路径</p>
-                <code class="admin-media-browser__detail-code">${escapeHtml(item.path)}</code>
-              </div>
+              <dl class="admin-media-browser__detail-meta-list">
+                <div><dt>Dimensions</dt><dd>${escapeHtml(dimensionsText)}</dd></div>
+                <div><dt>Size</dt><dd>${escapeHtml(sizeText)}</dd></div>
+                <div><dt>Type</dt><dd>${escapeHtml(typeText)}</dd></div>
+              </dl>
 
-              <div class="admin-media-browser__detail-field">
-                <p class="admin-media-browser__detail-label">像素尺寸</p>
-                <code class="admin-media-browser__detail-code">${escapeHtml(
-                  detailMeta?.width && detailMeta.height
-                    ? `${detailMeta.width} × ${detailMeta.height}`
-                    : detailLoading
-                      ? '正在读取…'
-                      : detailError
-                        ? '读取失败'
-                        : '未读取'
-                )}</code>
-              </div>
-
-              <div class="admin-media-browser__detail-field">
-                <p class="admin-media-browser__detail-label">文件大小</p>
-                <code class="admin-media-browser__detail-code">${escapeHtml(
-                  detailMeta
-                    ? formatBytes(detailMeta.size)
-                    : detailLoading
-                      ? '正在读取…'
-                      : detailError
-                        ? '读取失败'
-                        : '未读取'
-                )}</code>
-              </div>
-
-              <div class="admin-media-browser__detail-field">
-                <p class="admin-media-browser__detail-label">MIME</p>
-                <code class="admin-media-browser__detail-code">${escapeHtml(
-                  detailMeta?.mimeType
-                    ?? (detailLoading ? '正在读取…' : detailError ? '读取失败' : '未读取')
-                )}</code>
-              </div>
-
-              ${valueMarkup}
+              ${valueFieldMarkup}
+              ${markdownFieldMarkup}
 
               <div class="admin-media-browser__detail-actions">
-                <button class="admin-btn" type="button" data-action="copy-path">复制路径</button>
-                ${item.preferredValue && item.preferredValue !== item.path
-                  ? '<button class="admin-btn admin-btn--ghost" type="button" data-action="copy-preferred-value">复制可用值</button>'
-                  : ''}
-                ${(detailMeta?.previewSrc ?? item.previewSrc)
-                  ? `<a class="admin-btn admin-btn--ghost" href="${escapeHtml(detailMeta?.previewSrc ?? item.previewSrc ?? '')}" target="_blank" rel="noreferrer">打开预览</a>`
-                  : ''}
+                <button class="admin-btn admin-btn--primary" type="button" data-action="copy-path">
+                  ${linkIcon}
+                  复制资源路径
+                </button>
+                ${previewSrc
+            ? `<a class="admin-btn admin-btn--ghost" href="${escapeHtml(previewSrc)}" target="_blank" rel="noreferrer">
+                      ${eyeIcon}
+                      浏览器新标签中打开
+                    </a>`
+            : ''}
               </div>
             </div>
           </div>
@@ -882,19 +842,22 @@ if (root) {
         detailEl.querySelector<HTMLButtonElement>('[data-action="copy-path"]')?.addEventListener('click', async () => {
           try {
             await copyText(item.path);
-            setStatus('ok', `已复制文件路径：${item.path}`);
+            setStatus('ok', '已复制资源路径');
           } catch (error) {
-            setStatus('error', error instanceof Error ? error.message : '复制文件路径失败');
+            setStatus('error', error instanceof Error ? error.message : '复制资源路径失败');
           }
         });
 
-        detailEl.querySelector<HTMLButtonElement>('[data-action="copy-preferred-value"]')?.addEventListener('click', async () => {
-          if (!item.preferredValue) return;
+        detailEl.querySelector<HTMLButtonElement>('[data-action="copy-field-value"]')?.addEventListener('click', async (event) => {
+          const button = event.currentTarget instanceof HTMLButtonElement ? event.currentTarget : null;
           try {
-            await copyText(item.preferredValue);
-            setStatus('ok', `已复制可用值：${item.preferredValue}`);
+            await copyText(fieldValue);
+            setStatus('ok', `已复制${fieldCopyLabel}`);
+            if (button) {
+              triggerInlineCopyFeedback(button, fieldCopyLabel);
+            }
           } catch (error) {
-            setStatus('error', error instanceof Error ? error.message : '复制可用值失败');
+            setStatus('error', error instanceof Error ? error.message : `复制${fieldCopyLabel}失败`);
           }
         });
       };
@@ -920,7 +883,7 @@ if (root) {
         searchToggleBtn.dataset.active = searchVisible ? 'true' : 'false';
         searchToggleBtn.setAttribute('aria-expanded', searchVisible ? 'true' : 'false');
         recentBtn.disabled = busy || !hasLocalBrowse;
-        recentBtn.textContent = currentState.scope === 'recent' ? '返回分类' : SCOPE_LABELS.recent;
+        recentBtn.textContent = currentState.scope === 'recent' ? '返回分类' : ADMIN_MEDIA_SCOPE_LABELS.recent;
         recentBtn.setAttribute('aria-pressed', currentState.scope === 'recent' ? 'true' : 'false');
         refreshBtn.disabled = busy;
         prevBtn.disabled = busy || currentState.page <= 1;
@@ -1006,20 +969,13 @@ if (root) {
           })
           .finally(() => {
             detailMetaPending.delete(assetPath);
-            const isVisibleItem = currentItems.some((item) => item.path === assetPath);
-            if (isVisibleItem) {
-              renderItems();
+            if (currentItems.some((item) => item.path === assetPath)) {
+              syncRenderedCardMeta(assetPath);
             }
             if (selectedPath === assetPath) {
               renderDetail();
             }
           });
-      };
-
-      const preloadVisibleDetailMeta = () => {
-        currentItems.forEach((item) => {
-          ensureDetailMeta(item.path);
-        });
       };
 
       const applyListResult = (result: AdminMediaListResponse, { updateLocation }: { updateLocation: boolean }) => {
@@ -1049,27 +1005,29 @@ if (root) {
         renderItems();
         renderDetail();
         syncSummary();
-        preloadVisibleDetailMeta();
+        ensureDetailMeta(selectedPath);
       };
 
       const applyScopeState = ({ updateLocation }: { updateLocation: boolean }) => {
         if (!bootstrap.browseIndex || !currentState.scope) return;
 
-        const activeQuery = currentState.query.trim().toLowerCase();
-        const scopePool = buildScopeItems(currentState.scope, bootstrap.browseIndex, bootstrap.scopeIndex)
-          .filter((item) => matchesBrowseQuery(item, activeQuery));
+        const scopePool = buildAdminMediaScopeItems(currentState.scope, bootstrap.browseIndex, bootstrap.scopeIndex)
+          .filter((item) => matchesAdminMediaQuery(item, currentState.query));
+        const scopePage = paginateAdminMediaItems({
+          items: scopePool,
+          page: currentState.page,
+          limit: PAGE_SIZE
+        });
 
-        currentTotalCount = scopePool.length;
-        currentGroupOptions = buildGroupOptions(scopePool);
+        currentTotalCount = scopePage.totalCount;
+        currentGroupOptions = buildAdminMediaBrowseGroupOptions(scopePool);
         currentSubgroupOptions = [];
-        currentTotalPages = Math.max(1, Math.ceil(scopePool.length / PAGE_SIZE));
-        const safePage = Math.min(Math.max(currentState.page, 1), currentTotalPages);
-        const startIndex = (safePage - 1) * PAGE_SIZE;
-        currentItems = scopePool.slice(startIndex, startIndex + PAGE_SIZE);
+        currentTotalPages = scopePage.totalPages;
+        currentItems = scopePage.items;
         currentState = {
           ...currentState,
           query: currentState.query.trim(),
-          page: safePage
+          page: scopePage.page
         };
         draftQuery = currentState.query;
         syncSelection();
@@ -1080,45 +1038,33 @@ if (root) {
         renderItems();
         renderDetail();
         syncSummary();
-        preloadVisibleDetailMeta();
+        ensureDetailMeta(selectedPath);
         setStatus('ok', scopePool.length > 0 ? `已加载最近修改中的 ${scopePool.length} 张图片` : '最近修改中没有符合条件的图片', false);
       };
 
       const applyBrowseState = ({ updateLocation }: { updateLocation: boolean }) => {
         if (!bootstrap.browseIndex) return;
 
-        const activeQuery = currentState.query.trim();
-        const queryPool = bootstrap.browseIndex.filter((item) => matchesBrowseQuery(item, activeQuery.toLowerCase()));
-        const isKnownGroup = isAdminMediaBrowseGroup(currentState.group);
-        const browsePool = (() => {
-          if (!isKnownGroup) return [] as AdminMediaBrowseItem[];
-          if (currentState.group === DEFAULT_GROUP) return queryPool;
-          return queryPool.filter((item) => item.browseGroup === currentState.group);
-        })();
+        const browsePage = resolveAdminMediaBrowsePage({
+          items: bootstrap.browseIndex,
+          group: currentState.group,
+          subgroup: currentState.subgroup,
+          query: currentState.query,
+          page: currentState.page,
+          limit: PAGE_SIZE
+        });
 
-        currentGroupOptions = buildGroupOptions(queryPool);
-        currentSubgroupOptions = isKnownGroup && currentState.group !== DEFAULT_GROUP
-          ? buildSubgroupOptions(currentState.group as Exclude<AdminMediaBrowseGroup, 'all'>, browsePool)
-          : [];
-        const activeSubgroup = isKnownGroup
-          && currentState.group !== DEFAULT_GROUP
-          && currentSubgroupOptions.some((option) => option.value === currentState.subgroup)
-          ? currentState.subgroup
-          : '';
-        const filtered = activeSubgroup
-          ? browsePool.filter((item) => item.browseSubgroup === activeSubgroup)
-          : browsePool;
-        currentTotalCount = filtered.length;
-        currentTotalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-        const safePage = Math.min(Math.max(currentState.page, 1), currentTotalPages);
-        const startIndex = (safePage - 1) * PAGE_SIZE;
-        currentItems = filtered.slice(startIndex, startIndex + PAGE_SIZE);
+        currentGroupOptions = browsePage.groupOptions;
+        currentSubgroupOptions = browsePage.subgroupOptions;
+        currentTotalCount = browsePage.totalCount;
+        currentTotalPages = browsePage.totalPages;
+        currentItems = browsePage.items;
         currentState = {
           scope: DEFAULT_SCOPE,
-          group: currentState.group || DEFAULT_GROUP,
-          subgroup: currentState.group === DEFAULT_GROUP ? '' : activeSubgroup,
-          query: activeQuery,
-          page: safePage
+          group: browsePage.activeGroup,
+          subgroup: browsePage.activeGroup === DEFAULT_GROUP ? '' : browsePage.activeSubgroup,
+          query: browsePage.query,
+          page: browsePage.page
         };
         draftQuery = currentState.query;
         showHiddenGroups = showHiddenGroups || currentState.group === 'uncategorized';
@@ -1130,8 +1076,8 @@ if (root) {
         renderItems();
         renderDetail();
         syncSummary();
-        preloadVisibleDetailMeta();
-        setStatus('ok', filtered.length > 0 ? `已匹配 ${filtered.length} 张图片` : '没有找到符合条件的图片', false);
+        ensureDetailMeta(selectedPath);
+        setStatus('ok', browsePage.totalCount > 0 ? `已匹配 ${browsePage.totalCount} 张图片` : '没有找到符合条件的图片', false);
       };
 
       const loadList = async () => {
@@ -1274,8 +1220,9 @@ if (root) {
         const target = event.target instanceof HTMLElement ? event.target.closest<HTMLButtonElement>('[data-path]') : null;
         const nextPath = target?.dataset.path?.trim() ?? '';
         if (!nextPath || nextPath === selectedPath) return;
+        const previousPath = selectedPath;
         selectedPath = nextPath;
-        renderItems();
+        syncRenderedSelection(previousPath, selectedPath);
         renderDetail();
         ensureDetailMeta(selectedPath);
       });
@@ -1343,6 +1290,3 @@ if (root) {
     }
   }
 }
-
-
-

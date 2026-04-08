@@ -1,4 +1,5 @@
 ---
+import Icon from '../../../components/Icon.astro';
 import AdminLayout from '../../../components/admin/AdminLayout.astro';
 import AdminShell from '../../../components/admin/AdminShell.astro';
 import {
@@ -19,9 +20,13 @@ const selectedCategory: AdminChecksFilterValue = isAdminChecksCategoryId(selecte
   : 'all';
 
 const loadChecksDevState = async () => {
-  const { default: adminStylesHref } = await import('../../../styles/components/admin.css?url');
+  const [{ default: adminChecksScriptHref }, { default: adminStylesHref }] = await Promise.all([
+    import('../../../scripts/admin-checks/index.ts?url'),
+    import('../../../styles/components/admin.css?url')
+  ]);
 
   return {
+    adminChecksScriptHref,
     adminStylesHref,
     checks: await getAdminChecksData()
   };
@@ -49,151 +54,168 @@ const buildChecksHref = (category: AdminChecksFilterValue): string => {
   <AdminShell
     currentRoute="checks"
     title="Checks Console"
-    subtitle="结构化诊断与发布前自检"
+    subtitle="后台诊断"
     modeLabel={isDev ? 'DEV 快速扫描' : '只读模式'}
   >
+    {isDev ? (
+      <p
+        slot="status"
+        class="admin-sr-only"
+        data-admin-checks-status-live
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      ></p>
+    ) : null}
     {
       isDev && checksDevState ? (
         <section class="admin-overview admin-checks-console">
-          <article class="admin-overview-card admin-checks-toolbar">
-            <div class="admin-checks-toolbar__bar">
+          <header class="admin-overview-card admin-checks-toolbar" aria-labelledby="admin-checks-title">
+            <div class="admin-checks-toolbar__summary">
               <div class="admin-checks-toolbar__copy">
-                <p class="admin-overview-card__eyebrow">Checks</p>
-                <h2 class="admin-overview-card__title">当前源文件诊断概览</h2>
-                <p class="admin-overview-card__body">
-                  当前共发现 {checksDevState.checks.totalIssueCount} 个问题，分布在 {checksDevState.checks.blockedCategoryCount} 个分类，
-                  涉及 {checksDevState.checks.affectedPathCount} 个文件。筛选仅影响展示，不会触发额外构建。
+                <h2 id="admin-checks-title" class="admin-overview-card__title admin-checks-toolbar__title">诊断概览</h2>
+                <p class="admin-checks-toolbar__body">
+                  {
+                    checksDevState.checks.totalIssueCount > 0
+                      ? `当前共发现 ${checksDevState.checks.totalIssueCount} 个问题，分布在 ${checksDevState.checks.blockedCategoryCount} 个分类，涉及 ${checksDevState.checks.affectedPathCount} 个文件。`
+                      : '当前检查范围内未发现问题'
+                  }
                 </p>
               </div>
-              <div class="admin-overview-card__actions">
-                <a class="admin-btn admin-btn--ghost" href={withBase('/admin/')}>返回 Admin 首页</a>
-                <a class="admin-btn admin-btn--ghost" href={withBase('/admin/content/')}>打开 Content Console</a>
-              </div>
-            </div>
 
-            <div class="admin-content-switcher" role="tablist" aria-label="检查分类筛选">
-              <a
-                href={buildChecksHref('all')}
-                class:list={['admin-content-switcher__link', selectedCategory === 'all' && 'is-active']}
-                aria-current={selectedCategory === 'all' ? 'page' : undefined}
+              <form
+                class="admin-checks-toolbar__action"
+                method="get"
+                action={withBase('/admin/checks/')}
+                data-admin-checks-refresh-form
               >
-                全部
-              </a>
-              {
-                checksDevState.checks.categories.map((category) => (
-                  <a
-                    href={buildChecksHref(category.id as AdminChecksCategoryId)}
-                    class:list={['admin-content-switcher__link', selectedCategory === category.id && 'is-active']}
-                    aria-current={selectedCategory === category.id ? 'page' : undefined}
-                  >
-                    {category.label}
-                    {category.issueCount > 0 ? ` (${category.issueCount})` : ''}
-                  </a>
-                ))
-              }
+                {selectedCategory !== 'all' ? <input type="hidden" name="category" value={selectedCategory} /> : null}
+                <button class="admin-checks-toolbar__refresh-link" type="submit" data-admin-checks-refresh-button>
+                  重新检测
+                </button>
+              </form>
             </div>
 
-            <div class="admin-metric-grid admin-checks-toolbar__metrics">
-              <section class="admin-metric-card">
-                <p class="admin-metric-card__label">Issues</p>
-                <p class="admin-metric-card__value">{checksDevState.checks.totalIssueCount}</p>
-                <p class="admin-metric-card__meta">当前发现的问题总数</p>
-              </section>
-              <section class="admin-metric-card">
-                <p class="admin-metric-card__label">Blocked</p>
-                <p class="admin-metric-card__value">{checksDevState.checks.blockedCategoryCount}</p>
-                <p class="admin-metric-card__meta">存在问题的分类数</p>
-              </section>
-              <section class="admin-metric-card">
-                <p class="admin-metric-card__label">Files</p>
-                <p class="admin-metric-card__value">{checksDevState.checks.affectedPathCount}</p>
-                <p class="admin-metric-card__meta">被命中的源文件数</p>
-              </section>
-            </div>
-          </article>
+            <p class="admin-checks-toolbar__hint">
+              注：提交前仍建议执行 <code>npm run check</code>、<code>npm test</code>、<code>npm run build</code>。
+            </p>
+          </header>
+
+          <nav class="admin-checks-toolbar__filters" aria-label="检查分类筛选">
+            <a
+              href={buildChecksHref('all')}
+              class:list={['admin-checks-filter', selectedCategory === 'all' && 'is-active']}
+              aria-current={selectedCategory === 'all' ? 'page' : undefined}
+            >
+              <span class="admin-checks-filter__label">全部</span>
+              <span class="admin-checks-filter__count">{checksDevState.checks.totalIssueCount}</span>
+            </a>
+            {
+              checksDevState.checks.categories.map((category) => (
+                <a
+                  href={buildChecksHref(category.id as AdminChecksCategoryId)}
+                  class:list={['admin-checks-filter', selectedCategory === category.id && 'is-active']}
+                  aria-current={selectedCategory === category.id ? 'page' : undefined}
+                >
+                  <span class="admin-checks-filter__label">{category.label}</span>
+                  <span class="admin-checks-filter__count">{category.issueCount}</span>
+                </a>
+              ))
+            }
+          </nav>
 
           {
             visibleCategories.map((category) => (
-              <article class="admin-overview-card admin-checks-category">
+              <article class="admin-checks-category" data-status={category.status}>
                 <div class="admin-checks-category__head">
                   <div class="admin-checks-category__copy">
-                    <p class="admin-overview-card__eyebrow">{category.label}</p>
-                    <h2 class="admin-overview-card__title">{category.issueCount > 0 ? `${category.issueCount} 个待处理问题` : '当前分类已通过'}</h2>
-                    <p class="admin-overview-card__body">{category.description}</p>
+                    {
+                      selectedCategory !== 'all' ? (
+                        <div class="admin-checks-category__title-row">
+                          <h2 class="admin-checks-category__title">{category.label}</h2>
+                          <span class="admin-checks-category__description">{category.description}</span>
+                        </div>
+                      ) : (
+                        <h2 class="admin-checks-category__title">{category.label}</h2>
+                      )
+                    }
                   </div>
-                  <div class="admin-checks-category__badges">
-                    <span class="admin-badge">{category.statusLabel}</span>
-                    <span class="admin-badge">issue {category.issueCount}</span>
-                  </div>
+                  <span
+                    class:list={[
+                      'admin-checks-status',
+                      category.issueCount > 0 ? 'admin-checks-status--error' : 'admin-checks-status--ok'
+                    ]}
+                  >
+                    {category.issueCount > 0 ? `${category.issueCount} 个问题` : '正常'}
+                  </span>
                 </div>
 
                 {
                   category.issueCount > 0 ? (
-                    <ul class="admin-checks-issue-list">
+                    <ol class="admin-checks-issue-list">
                       {
                         category.issues.map((issue) => (
                           <li class="admin-checks-issue">
-                            <div class="admin-checks-issue__head">
-                              <div class="admin-checks-issue__copy">
-                                <h3 class="admin-checks-issue__title">{issue.title}</h3>
-                                <p class="admin-overview-card__body">{issue.message}</p>
+                            <span class="admin-checks-issue__icon" aria-hidden="true">
+                              <Icon name="x-mark" class="admin-checks-issue__icon-mark" size={10} />
+                            </span>
+                            <div class="admin-checks-issue__body">
+                              <div class="admin-checks-issue__head">
+                                <div class="admin-checks-issue__copy">
+                                  <h3 class="admin-checks-issue__title">{issue.title}</h3>
+                                  <p class="admin-checks-issue__message">{issue.message}</p>
+                                  {issue.detail ? <p class="admin-checks-issue__detail">{issue.detail}</p> : null}
+                                </div>
+                                {
+                                  issue.href ? (
+                                    <a class="admin-checks-issue__link" href={withBase(issue.href)}>查看详情</a>
+                                  ) : null
+                                }
                               </div>
-                              {
-                                issue.href ? (
-                                  <a class="admin-btn admin-btn--ghost" href={withBase(issue.href)}>定位条目</a>
-                                ) : null
-                              }
-                            </div>
 
-                            <dl class="admin-data-meta admin-checks-issue__meta">
-                              {
-                                issue.collection ? (
-                                  <>
-                                    <dt class="admin-data-meta__label">collection</dt>
-                                    <dd class="admin-data-meta__value">{issue.collection}</dd>
-                                  </>
-                                ) : null
-                              }
-                              {
-                                issue.entryId ? (
-                                  <>
-                                    <dt class="admin-data-meta__label">entry.id</dt>
-                                    <dd class="admin-data-meta__value"><code>{issue.entryId}</code></dd>
-                                  </>
-                                ) : null
-                              }
-                              {
-                                issue.relativePath ? (
-                                  <>
-                                    <dt class="admin-data-meta__label">path</dt>
-                                    <dd class="admin-data-meta__value"><code>{issue.relativePath}</code></dd>
-                                  </>
-                                ) : null
-                              }
-                              {
-                                issue.fieldPath ? (
-                                  <>
-                                    <dt class="admin-data-meta__label">field</dt>
-                                    <dd class="admin-data-meta__value"><code>{issue.fieldPath}</code></dd>
-                                  </>
-                                ) : null
-                              }
-                              {
-                                issue.detail ? (
-                                  <>
-                                    <dt class="admin-data-meta__label">detail</dt>
-                                    <dd class="admin-data-meta__value">{issue.detail}</dd>
-                                  </>
-                                ) : null
-                              }
-                            </dl>
+                              <p class="admin-checks-issue__meta">
+                                {
+                                  issue.collection ? (
+                                    <span class="admin-checks-meta-item">
+                                      <span class="admin-checks-meta-item__label">collection:</span>
+                                      <span class="admin-checks-meta-item__value">{issue.collection}</span>
+                                    </span>
+                                  ) : null
+                                }
+                                {
+                                  issue.entryId ? (
+                                    <span class="admin-checks-meta-item">
+                                      <span class="admin-checks-meta-item__label">entry.id:</span>
+                                      <code class="admin-checks-meta-item__value">{issue.entryId}</code>
+                                    </span>
+                                  ) : null
+                                }
+                                {
+                                  issue.fieldPath ? (
+                                    <span class="admin-checks-meta-item">
+                                      <span class="admin-checks-meta-item__label">field:</span>
+                                      <code class="admin-checks-meta-item__value">{issue.fieldPath}</code>
+                                    </span>
+                                  ) : null
+                                }
+                                {
+                                  issue.relativePath ? (
+                                    <span class="admin-checks-meta-item">
+                                      <span class="admin-checks-meta-item__label">path:</span>
+                                      <code class="admin-checks-meta-item__value">{issue.relativePath}</code>
+                                    </span>
+                                  ) : null
+                                }
+                              </p>
+                            </div>
                           </li>
                         ))
                       }
-                    </ul>
+                    </ol>
                   ) : (
                     <p class="admin-checks-empty">
-                      当前分类未发现结构化问题；提交前仍建议执行 `npm run check`、`npm test` 与 `npm run build`。
+                      <span class="admin-checks-empty__icon" aria-hidden="true">✓</span>
+                      <span>当前分类未发现问题</span>
                     </p>
                   )
                 }
@@ -228,4 +250,10 @@ const buildChecksHref = (category: AdminChecksFilterValue): string => {
       )
     }
   </AdminShell>
+
+  {
+    isDev && checksDevState?.adminChecksScriptHref ? (
+      <script is:inline type="module" src={checksDevState.adminChecksScriptHref}></script>
+    ) : null
+  }
 </AdminLayout>

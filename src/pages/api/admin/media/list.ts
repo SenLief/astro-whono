@@ -1,9 +1,9 @@
 import type { APIRoute } from 'astro';
 import {
   AdminMediaError,
-  getAdminMediaListRequest,
-  listAdminMediaItems
-} from '../../../../lib/admin-console/media-shared';
+  getAdminMediaListRequest
+} from '../../../../lib/admin-console/media-params';
+import { listAdminMediaItems } from '../../../../lib/admin-console/media-shared';
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',

@@ -20,6 +20,22 @@
   --admin-error-surface-border: rgba(168, 79, 75, 0.12);
   --admin-error-code-bg: rgba(58, 42, 42, 0.05);
   --admin-error-shadow: rgba(118, 61, 58, 0.16);
+  --admin-font-ui:
+    "Microsoft YaHei UI",
+    "Microsoft YaHei",
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Segoe UI",
+    sans-serif;
+  --admin-font-copy: "LXGW WenKai Lite", "Kaiti SC", "STKaiti", serif;
+  --admin-text-2xs: 0.6875rem;
+  --admin-text-xs: 0.75rem;
+  --admin-text-sm: 0.8125rem;
+  --admin-text-base: 0.875rem;
+  --admin-tracking-tight: 0.04em;
+  --admin-tracking-wide: 0.06em;
+  --admin-tracking-xwide: 0.08em;
+  --admin-leading-body: 1.6;
 }
 
 :root[data-theme='dark'] {
@@ -118,10 +134,10 @@
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--panel);
-  font-size: 13px;
+  font-size: var(--admin-text-sm);
   line-height: 1;
   color: var(--text);
-  font-family: "LXGW WenKai Lite", "Kaiti SC", "STKaiti", serif;
+  font-family: var(--admin-font-copy);
   white-space: nowrap;
 }
 
@@ -224,8 +240,8 @@
   border-radius: 16px;
   border: 1px solid var(--border);
   background: var(--panel);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--admin-text-sm);
+  line-height: var(--admin-leading-body);
   color: var(--text);
 }
 
@@ -239,10 +255,10 @@
   flex: 1 1 260px;
   min-width: 0;
   max-width: 520px;
-  font-size: 12px;
+  font-size: var(--admin-text-xs);
   line-height: 1.55;
   letter-spacing: 0.01em;
-  font-family: "LXGW WenKai Lite", "Kaiti SC", "STKaiti", serif;
+  font-family: var(--admin-font-copy);
 }
 
 .admin-banner--error {
@@ -400,8 +416,8 @@
   border-radius: 8px;
   border: 1px solid var(--admin-error-surface-border);
   background: var(--admin-error-code-bg);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: var(--admin-text-xs);
+  line-height: var(--admin-leading-body);
   font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", "Fira Code", Consolas, monospace;
   white-space: pre-wrap;
   word-break: break-word;
@@ -416,7 +432,7 @@
 
 .admin-field__label {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--admin-text-sm);
 }
 
 .admin-console[data-console-locked='true'] .admin-form,
@@ -634,8 +650,8 @@
   color: var(--text);
   padding: 8px 10px;
   font: inherit;
-  font-family: "LXGW WenKai Lite", "Kaiti SC", "STKaiti", serif;
-  font-size: 14px;
+  font-family: var(--admin-font-copy);
+  font-size: var(--admin-text-base);
   line-height: 1.4;
   transition:
     border-color 160ms ease,
@@ -1162,8 +1178,8 @@
   border-radius: 10px;
   padding: 0 12px;
   font: inherit;
-  font-family: "LXGW WenKai Lite", "Kaiti SC", "STKaiti", serif;
-  font-size: 13px;
+  font-family: var(--admin-font-copy);
+  font-size: var(--admin-text-sm);
   cursor: pointer;
 }
 

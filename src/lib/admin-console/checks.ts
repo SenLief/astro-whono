@@ -77,22 +77,22 @@ const ADMIN_CHECKS_CATEGORIES = [
   {
     id: 'settings',
     label: 'Settings',
-    description: '复用 Theme Console 的 invalid-settings 保护态与 JSON 结构诊断。'
+    description: '检查 settings 文件是否缺字段或结构异常。'
   },
   {
     id: 'essay-slug',
-    label: 'Essay Slug',
-    description: '扫描 essay public slug 的格式、保留路由冲突与全局唯一性。'
+    label: '随笔 Slug',
+    description: '检查 slug 格式、重复和保留路由冲突。'
   },
   {
     id: 'bits-media',
-    label: 'Bits Media',
-    description: '扫描 bits 作者头像与卡片图片的路径合法性及本地文件存在性。'
+    label: 'Bits 图片',
+    description: '检查头像和图片路径是否有效，引用文件是否存在。'
   },
   {
     id: 'tag',
     label: 'Tags',
-    description: '复用 tag 规范化逻辑，检查不可路由的 tag key。'
+    description: '检查标签 key 是否可正常生成路由。'
   }
 ] as const satisfies readonly {
   id: AdminChecksCategoryId;

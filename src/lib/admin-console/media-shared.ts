@@ -2,6 +2,32 @@ import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
+  ADMIN_MEDIA_BROWSE_GROUP_LABELS,
+  type AdminMediaBrowseGroup,
+  type AdminMediaOrigin
+} from './media-contract';
+import {
+  matchesAdminMediaQuery,
+  normalizeAdminMediaBrowseGroup,
+  normalizeAdminMediaBrowseSubgroup,
+  resolveAdminMediaBrowsePage,
+  type AdminMediaBrowseFilterOption,
+  type AdminMediaBrowseResolvedGroup,
+  type AdminMediaScopeIndex
+} from './media-browse';
+import {
+  AdminMediaError,
+  getAdminMediaCompatibleFieldValues,
+  getAdminMediaFieldSortRank,
+  getAdminMediaFieldValue,
+  normalizeAdminLocalImageSource,
+  normalizeAdminMediaOwnerValue,
+  type AdminMediaDirectory,
+  type AdminMediaFieldContext,
+  type AdminMediaListRequest,
+  type AdminMediaMetaInput
+} from './media-params';
+import {
   getBitsAvatarLocalFilePath,
   getHeroImageLocalFilePath,
   normalizeBitsAvatarPath,
@@ -9,26 +35,26 @@ import {
   toSafeHttpUrl
 } from '../../utils/format';
 
-export type AdminMediaFieldContext =
-  | 'bits.images'
-  | 'home.heroImageSrc'
-  | 'page.bits.defaultAuthor.avatar';
-
-export type AdminMediaOrigin = 'public' | 'src/assets' | 'src/content';
-export type AdminMediaDirectory =
-  | ''
-  | 'public'
-  | 'public/author'
-  | 'public/bits'
-  | 'public/images'
-  | 'src/assets'
-  | 'src/content';
-
-export type AdminMediaDirectoryOption = {
-  value: AdminMediaDirectory;
-  label: string;
-  description: string;
-};
+export type { AdminMediaBrowseGroup, AdminMediaOrigin, AdminMediaScopeKey } from './media-contract';
+export type { AdminMediaScopeIndex } from './media-browse';
+export {
+  ADMIN_MEDIA_DIRECTORY_OPTIONS,
+  AdminMediaError,
+  getAdminMediaListRequest,
+  getAdminMediaMetaRequest,
+  isAdminMediaDirectory,
+  isAdminMediaFieldContext,
+  normalizeAdminBitsImageSource,
+  normalizeAdminLocalImageSource,
+  normalizeAdminMediaDirectory
+} from './media-params';
+export type {
+  AdminMediaDirectory,
+  AdminMediaDirectoryOption,
+  AdminMediaFieldContext,
+  AdminMediaListRequest,
+  AdminMediaMetaInput
+} from './media-params';
 
 export type AdminMediaOwnerOption = {
   value: string;
@@ -36,26 +62,9 @@ export type AdminMediaOwnerOption = {
   count: number;
 };
 
-export type AdminMediaBrowseGroup = 'all' | 'essay' | 'bits' | 'memo' | 'assets' | 'pages' | 'uncategorized';
+export type AdminMediaBrowseGroupOption = AdminMediaBrowseFilterOption;
 
-export type AdminMediaBrowseGroupOption = {
-  value: AdminMediaBrowseGroup;
-  label: string;
-  count: number;
-  hidden?: boolean;
-};
-
-export type AdminMediaBrowseSubgroupOption = {
-  value: string;
-  label: string;
-  count: number;
-};
-
-export type AdminMediaScopeKey = 'recent';
-
-export type AdminMediaScopeIndex = {
-  recent: string[];
-};
+export type AdminMediaBrowseSubgroupOption = AdminMediaBrowseFilterOption;
 
 export type AdminMediaBrowseIndexItem = {
   path: string;
@@ -126,8 +135,6 @@ type AdminMediaAssetRecord = {
   ownerLabel: string | null;
 };
 
-type AdminMediaBrowseResolvedGroup = Exclude<AdminMediaBrowseGroup, 'all'>;
-
 type AdminMediaAssetBrowseMeta = {
   browseGroup: AdminMediaBrowseResolvedGroup;
   browseGroupLabel: string;
@@ -139,17 +146,6 @@ type AdminMediaAssetBrowseMeta = {
 
 type AdminMediaBrowseAsset = AdminMediaAssetRecord & { value: string } & AdminMediaAssetBrowseMeta;
 
-type AdminMediaListRequest = {
-  field: AdminMediaFieldContext | null;
-  directory: AdminMediaDirectory;
-  owner: string;
-  group: string;
-  subgroup: string;
-  query: string;
-  page: number;
-  limit: number;
-};
-
 type ContentCollectionKey = keyof typeof CONTENT_COLLECTION_LABELS;
 
 type AdminMediaContentOwner = {
@@ -157,18 +153,6 @@ type AdminMediaContentOwner = {
   label: string;
   aliases: string[];
 };
-
-type AdminMediaMetaInput =
-  | {
-      field: AdminMediaFieldContext;
-      value: string;
-      path?: string;
-    }
-  | {
-      path: string;
-      field?: AdminMediaFieldContext;
-      value?: string;
-    };
 
 type LocalMediaTarget = {
   path: string;
@@ -229,26 +213,6 @@ const MIME_BY_EXT: Record<string, string> = {
   '.svg': 'image/svg+xml',
   '.webp': 'image/webp'
 };
-const ADMIN_MEDIA_BROWSE_GROUP_LABELS = {
-  all: '全部',
-  essay: '随笔',
-  bits: 'Bits',
-  memo: 'Memo',
-  assets: '配置素材',
-  pages: '公共页面图',
-  uncategorized: '未归类'
-} as const satisfies Record<AdminMediaBrowseGroup, string>;
-
-const ADMIN_MEDIA_BROWSE_GROUP_ORDER = [
-  'all',
-  'essay',
-  'bits',
-  'memo',
-  'assets',
-  'pages',
-  'uncategorized'
-] as const satisfies readonly AdminMediaBrowseGroup[];
-
 const ADMIN_MEDIA_PAGE_ALLOWLIST = [
   { prefix: 'public/images/archive/', subgroup: 'archive', label: 'Archive' },
   { prefix: 'public/images/home/', subgroup: 'home', label: 'Home' },
@@ -265,36 +229,6 @@ const SYSTEM_ASSET_FILE_PATTERNS = [
   /^apple-touch-icon(?:[-\w]*)?\.(?:avif|gif|jpe?g|png|svg|webp)$/i,
   /^preview-[^/]+\.(?:avif|gif|jpe?g|png|svg|webp)$/i
 ] as const;
-
-const FIELD_CONFIG: Record<
-  AdminMediaFieldContext,
-  {
-    allowedOrigins: readonly AdminMediaOrigin[];
-    preferredPrefixes: readonly string[];
-    toValue: (assetPath: string, origin: AdminMediaOrigin) => string | null;
-  }
-> = {
-  'bits.images': {
-    allowedOrigins: ['public'],
-    preferredPrefixes: ['public/bits/', 'public/images/', 'public/author/', 'public/'],
-    toValue: (assetPath, origin) => (origin === 'public' ? assetPath.slice('public/'.length) : null)
-  },
-  'home.heroImageSrc': {
-    allowedOrigins: ['src/assets', 'public'],
-    preferredPrefixes: ['src/assets/', 'public/images/', 'public/'],
-    toValue: (assetPath, origin) => {
-      if (origin === 'src/assets') return assetPath;
-      if (origin === 'public') return `/${assetPath.slice('public/'.length)}`;
-      return null;
-    }
-  },
-  'page.bits.defaultAuthor.avatar': {
-    allowedOrigins: ['public'],
-    preferredPrefixes: ['public/author/', 'public/bits/', 'public/images/', 'public/'],
-    toValue: (assetPath, origin) => (origin === 'public' ? assetPath.slice('public/'.length) : null)
-  }
-};
-const ADMIN_MEDIA_FIELD_CONTEXTS = Object.freeze(Object.keys(FIELD_CONFIG) as AdminMediaFieldContext[]);
 const adminMediaOwnerOptionsCache = new Map<string, AdminMediaShortCacheEntry<AdminMediaContentOwner[]>>();
 const adminMediaOwnerOptionsPendingLoads = new Map<string, Promise<AdminMediaContentOwner[]>>();
 const adminMediaAssetListCache = new Map<string, AdminMediaShortCacheEntry<AdminMediaAssetRecord[]>>();
@@ -304,78 +238,7 @@ const adminMediaInspectionMetaPendingLoads = new Map<string, Promise<AdminMediaI
 const adminMediaScopeIndexCache = new Map<string, AdminMediaShortCacheEntry<AdminMediaScopeIndex>>();
 const adminMediaScopeIndexPendingLoads = new Map<string, Promise<AdminMediaScopeIndex>>();
 
-export const ADMIN_MEDIA_DIRECTORY_OPTIONS = [
-  {
-    value: '',
-    label: '全部资源',
-    description: '查看站点里可用的本地图片。'
-  },
-  {
-    value: 'public/author',
-    label: '头像资源',
-    description: '查看作者头像和默认头像图片。'
-  },
-  {
-    value: 'public/bits',
-    label: '絮语配图',
-    description: '查看絮语常用的公开配图。'
-  },
-  {
-    value: 'public/images',
-    label: '页面插图',
-    description: '查看首页和普通页面使用的插图。'
-  },
-  {
-    value: 'public',
-    label: '公开图片',
-    description: '查看 public 下的全部公开图片。'
-  },
-  {
-    value: 'src/assets',
-    label: '站点素材',
-    description: '查看站点主题和首页使用的本地素材。'
-  },
-  {
-    value: 'src/content',
-    label: '文章附件',
-    description: '查看文章或笔记同目录下的图片附件。'
-  }
-] as const satisfies readonly AdminMediaDirectoryOption[];
-
 const getProjectRoot = (): string => process.env.ASTRO_WHONO_INTERNAL_TEST_PROJECT_ROOT?.trim() || process.cwd();
-
-export const isAdminMediaFieldContext = (value: string): value is AdminMediaFieldContext =>
-  value in FIELD_CONFIG;
-
-export const isAdminMediaDirectory = (value: string): value is AdminMediaDirectory =>
-  ADMIN_MEDIA_DIRECTORY_OPTIONS.some((option) => option.value === value);
-
-export const normalizeAdminMediaDirectory = (value: string | null | undefined): AdminMediaDirectory => {
-  const normalized = (value ?? '').trim().replace(/\\/g, '/');
-  return isAdminMediaDirectory(normalized) ? normalized : '';
-};
-
-export class AdminMediaError extends Error {
-  status: number;
-
-  constructor(message: string, status = 400) {
-    super(message);
-    this.name = 'AdminMediaError';
-    this.status = status;
-  }
-}
-
-const normalizePositiveInteger = (
-  value: string | null,
-  { fallback, min = 1, max = Number.MAX_SAFE_INTEGER }: { fallback: number; min?: number; max?: number }
-): number => {
-  const parsed = Number.parseInt((value ?? '').trim(), 10);
-  if (!Number.isInteger(parsed)) return fallback;
-  return Math.min(Math.max(parsed, min), max);
-};
-
-const normalizeSearchQuery = (value: string | null): string => (value ?? '').trim().toLowerCase();
-const normalizeOwnerValue = (value: string | null | undefined): string => (value ?? '').trim().replace(/\\/g, '/');
 const toAbsoluteAssetPath = (assetPath: string): string => path.join(getProjectRoot(), ...assetPath.split('/'));
 const getAdminMediaCacheKey = (...parts: string[]): string => `${getProjectRoot()}::${parts.join('::')}`;
 
@@ -428,30 +291,6 @@ const withAdminMediaShortCache = async <T>(
     });
   pendingLoads.set(key, nextLoad);
   return nextLoad;
-};
-
-export const normalizeAdminLocalImageSource = (value: string): string | null => {
-  const normalized = value.trim().replace(/\\/g, '/').replace(/^\.\/+/, '');
-  if (
-    !normalized
-    || normalized.startsWith('/')
-    || normalized.startsWith('//')
-    || normalized.startsWith('public/')
-    || /^[A-Za-z]+:\/\//.test(normalized)
-    || /(^|\/)\.\.(?:\/|$)/.test(normalized)
-    || normalized.includes('?')
-    || normalized.includes('#')
-  ) {
-    return null;
-  }
-
-  return IMAGE_LOCAL_EXT_RE.test(normalized) ? normalized : null;
-};
-
-export const normalizeAdminBitsImageSource = (value: string): string | null => {
-  const safeRemoteUrl = toSafeHttpUrl(value);
-  if (safeRemoteUrl && safeRemoteUrl.startsWith('https://')) return safeRemoteUrl;
-  return normalizeAdminLocalImageSource(value);
 };
 
 const toDevFsPreviewSrc = (assetPath: string): string =>
@@ -698,56 +537,22 @@ const listAdminMediaAssets = async (
   );
 };
 
-const getFieldSortRank = (field: AdminMediaFieldContext | null, assetPath: string): number => {
-  if (!field) return 999;
-  const prefixes = FIELD_CONFIG[field].preferredPrefixes;
-  const index = prefixes.findIndex((prefix) => assetPath.startsWith(prefix));
-  return index === -1 ? prefixes.length : index;
-};
-
 const sortMediaAssets = (field: AdminMediaFieldContext | null, left: AdminMediaAssetRecord, right: AdminMediaAssetRecord): number => {
   const rankDiff = field
-    ? getFieldSortRank(field, left.path) - getFieldSortRank(field, right.path)
+    ? getAdminMediaFieldSortRank(field, left.path) - getAdminMediaFieldSortRank(field, right.path)
     : getOriginSortRank(left.path) - getOriginSortRank(right.path);
   if (rankDiff !== 0) return rankDiff;
   return left.path.localeCompare(right.path);
 };
 
-const matchesMediaQuery = (record: AdminMediaAssetRecord, query: string): boolean => {
-  if (!query) return true;
-  const haystack = `${record.path} ${record.fileName} ${record.owner ?? ''} ${record.ownerLabel ?? ''}`.toLowerCase();
-  return haystack.includes(query);
-};
-
-const toFieldValue = (field: AdminMediaFieldContext | null, record: AdminMediaAssetRecord): string | null => {
-  if (!field) return record.path;
-  const config = FIELD_CONFIG[field];
-  if (!config.allowedOrigins.includes(record.origin)) return null;
-  return config.toValue(record.path, record.origin);
-};
-
 const getCompatibleFieldValues = (record: AdminMediaAssetRecord): string[] =>
-  Array.from(
-    new Set(
-      ADMIN_MEDIA_FIELD_CONTEXTS.map((field) => toFieldValue(field, record)).filter(
-        (value): value is string => typeof value === 'string' && value.length > 0
-      )
-    )
-  );
+  getAdminMediaCompatibleFieldValues(record.path, record.origin);
 
 const getPreferredFieldValue = (record: AdminMediaAssetRecord): string | null => {
   const compatibleValues = getCompatibleFieldValues(record);
   const [preferredValue] = compatibleValues;
   return compatibleValues.length === 1 ? preferredValue ?? null : null;
 };
-const normalizeBrowseGroupParam = (value: string | null | undefined): string =>
-  (value ?? '').trim().toLowerCase().replace(/\\/g, '/');
-
-const normalizeBrowseSubgroupParam = (value: string | null | undefined): string =>
-  (value ?? '').trim().replace(/\\/g, '/');
-
-const isAdminMediaBrowseGroup = (value: string): value is AdminMediaBrowseGroup =>
-  value in ADMIN_MEDIA_BROWSE_GROUP_LABELS;
 
 const isSystemAssetPath = (assetPath: string): boolean => {
   if (path.posix.dirname(assetPath) !== 'public') return false;
@@ -864,48 +669,6 @@ const resolveBrowseMeta = (record: AdminMediaAssetRecord): AdminMediaAssetBrowse
     preferredValue,
     hiddenFromBrowse: false
   };
-};
-
-const buildBrowseGroupOptions = (assets: readonly AdminMediaBrowseAsset[]): AdminMediaBrowseGroupOption[] => {
-  const groupCounts = assets.reduce((counts, asset) => {
-    counts.set(asset.browseGroup, (counts.get(asset.browseGroup) ?? 0) + 1);
-    return counts;
-  }, new Map<AdminMediaBrowseResolvedGroup, number>());
-
-  return ADMIN_MEDIA_BROWSE_GROUP_ORDER.map((group) => ({
-    value: group,
-    label: ADMIN_MEDIA_BROWSE_GROUP_LABELS[group],
-    count: group === 'all' ? assets.length : (groupCounts.get(group) ?? 0),
-    hidden: group === 'uncategorized'
-  }));
-};
-
-const buildBrowseSubgroupOptions = (
-  group: AdminMediaBrowseResolvedGroup,
-  assets: readonly AdminMediaBrowseAsset[]
-): AdminMediaBrowseSubgroupOption[] => {
-  const subgroupMap = assets.reduce((map, asset) => {
-    if (asset.browseGroup !== group || !asset.browseSubgroup) return map;
-    const current = map.get(asset.browseSubgroup);
-    if (current) {
-      current.count += 1;
-      return map;
-    }
-
-    map.set(asset.browseSubgroup, {
-      value: asset.browseSubgroup,
-      label: asset.browseSubgroupLabel ?? asset.browseSubgroup,
-      count: 1
-    });
-    return map;
-  }, new Map<string, AdminMediaBrowseSubgroupOption>());
-
-  return Array.from(subgroupMap.values()).sort((left, right) => {
-    if (/^(?:19|20)\d{2}$/.test(left.value) && /^(?:19|20)\d{2}$/.test(right.value)) {
-      return Number.parseInt(right.value, 10) - Number.parseInt(left.value, 10);
-    }
-    return left.label.localeCompare(right.label, 'zh-CN');
-  });
 };
 
 export const invalidateAdminMediaCaches = (): void => {
@@ -1356,52 +1119,38 @@ export const listAdminMediaItems = async ({
   subgroup = '',
   query = '',
   page = 1,
-  limit = 24
+  limit = 20
 }: Partial<AdminMediaListRequest> = {}): Promise<AdminMediaListResult> => {
-  const normalizedQuery = query.trim().toLowerCase();
-  const normalizedGroup = normalizeBrowseGroupParam(group);
-  const normalizedSubgroup = normalizeBrowseSubgroupParam(subgroup);
+  const normalizedQuery = query.trim();
+  const normalizedGroup = normalizeAdminMediaBrowseGroup(group);
+  const normalizedSubgroup = normalizeAdminMediaBrowseSubgroup(subgroup);
   const safeLimit = Math.max(1, Math.min(limit, 60));
   const isBrowseMode = !field && normalizedGroup.length > 0;
 
   if (isBrowseMode) {
-    const browseAssets = (await listAdminMediaBrowseAssets()).filter((asset) => matchesMediaQuery(asset, normalizedQuery));
-
-    const groupOptions = buildBrowseGroupOptions(browseAssets);
-    const isKnownGroup = isAdminMediaBrowseGroup(normalizedGroup);
-    const browsePool = (() => {
-      if (!isKnownGroup) return [] as AdminMediaBrowseAsset[];
-      if (normalizedGroup === 'all') return browseAssets;
-      return browseAssets.filter((asset) => asset.browseGroup === normalizedGroup);
-    })();
-    const subgroupOptions = isKnownGroup && normalizedGroup !== 'all'
-      ? buildBrowseSubgroupOptions(normalizedGroup, browsePool)
-      : [];
-    const activeSubgroup = isKnownGroup && normalizedGroup !== 'all' && subgroupOptions.some((option) => option.value === normalizedSubgroup)
-      ? normalizedSubgroup
-      : '';
-    const filtered = activeSubgroup
-      ? browsePool.filter((asset) => asset.browseSubgroup === activeSubgroup)
-      : browsePool;
-    const totalPages = Math.max(1, Math.ceil(filtered.length / safeLimit));
-    const safePage = Math.min(Math.max(page, 1), totalPages);
-    const startIndex = (safePage - 1) * safeLimit;
-    const pageItems = filtered.slice(startIndex, startIndex + safeLimit);
-    const items = await Promise.all(pageItems.map((item) => toAdminMediaListItem(item, item)));
+    const browsePage = resolveAdminMediaBrowsePage({
+      items: await listAdminMediaBrowseAssets(),
+      group: normalizedGroup,
+      subgroup: normalizedSubgroup,
+      query: normalizedQuery,
+      page,
+      limit: safeLimit
+    });
+    const items = await Promise.all(browsePage.items.map((item) => toAdminMediaListItem(item, item)));
 
     return {
       field: null,
       directory: '',
       owner: '',
       ownerOptions: [],
-      group: normalizedGroup,
-      subgroup: activeSubgroup,
-      groupOptions,
-      subgroupOptions,
-      page: safePage,
+      group: browsePage.activeGroup,
+      subgroup: browsePage.activeGroup && browsePage.activeGroup !== 'all' ? browsePage.activeSubgroup : '',
+      groupOptions: browsePage.groupOptions,
+      subgroupOptions: browsePage.subgroupOptions,
+      page: browsePage.page,
       limit: safeLimit,
-      totalCount: filtered.length,
-      totalPages,
+      totalCount: browsePage.totalCount,
+      totalPages: browsePage.totalPages,
       items
     };
   }
@@ -1410,13 +1159,13 @@ export const listAdminMediaItems = async ({
   const assets = await listAdminMediaAssets(directory, contentOwners);
   const mappedAssets = assets
     .map((asset) => {
-      const value = toFieldValue(field, asset);
+      const value = getAdminMediaFieldValue(field, asset.path, asset.origin);
       if (!value) return null;
       return { ...asset, value };
     })
     .filter((asset): asset is AdminMediaAssetRecord & { value: string } => asset !== null);
   const queryMatchedAssets = mappedAssets
-    .filter((asset) => matchesMediaQuery(asset, normalizedQuery))
+    .filter((asset) => matchesAdminMediaQuery(asset, normalizedQuery))
     .sort((left, right) => sortMediaAssets(field, left, right));
   const ownerCountMap = queryMatchedAssets.reduce((counts, asset) => {
     if (!asset.owner) return counts;
@@ -1434,7 +1183,7 @@ export const listAdminMediaItems = async ({
     : [];
   const normalizedOwner = directory === 'src/content'
     ? (() => {
-        const candidate = normalizeOwnerValue(owner);
+        const candidate = normalizeAdminMediaOwnerValue(owner);
         return ownerOptions.some((option) => option.value === candidate) ? candidate : '';
       })()
     : '';
@@ -1459,19 +1208,5 @@ export const listAdminMediaItems = async ({
     totalCount: filtered.length,
     totalPages,
     items
-  };
-};
-
-export const getAdminMediaListRequest = (searchParams: URLSearchParams): AdminMediaListRequest => {
-  const rawField = (searchParams.get('field') ?? '').trim();
-  return {
-    field: isAdminMediaFieldContext(rawField) ? rawField : null,
-    directory: normalizeAdminMediaDirectory(searchParams.get('dir')),
-    owner: normalizeOwnerValue(searchParams.get('owner')),
-    group: normalizeBrowseGroupParam(searchParams.get('group')),
-    subgroup: normalizeBrowseSubgroupParam(searchParams.get('sub')),
-    query: normalizeSearchQuery(searchParams.get('q')),
-    page: normalizePositiveInteger(searchParams.get('page'), { fallback: 1 }),
-    limit: normalizePositiveInteger(searchParams.get('limit'), { fallback: 24, max: 60 })
   };
 };
