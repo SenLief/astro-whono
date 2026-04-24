@@ -53,6 +53,9 @@ type ValidationContext = {
   inputArticleMetaShowTags: HTMLInputElement;
   inputArticleMetaShowWordCount: HTMLInputElement;
   inputArticleMetaShowReadingTime: HTMLInputElement;
+  inputSidebarActionsShowRssLink: HTMLInputElement;
+  inputSidebarActionsShowThemeToggle: HTMLInputElement;
+  inputSidebarActionsShowAdminEntry: HTMLInputElement;
   inputPageBitsAuthorName: HTMLInputElement;
   inputPageBitsAuthorAvatar: HTMLInputElement;
   inputSidebarDividerDefault: HTMLInputElement;
@@ -114,6 +117,9 @@ export const createValidation = ({
   inputArticleMetaShowTags,
   inputArticleMetaShowWordCount,
   inputArticleMetaShowReadingTime,
+  inputSidebarActionsShowRssLink,
+  inputSidebarActionsShowThemeToggle,
+  inputSidebarActionsShowAdminEntry,
   inputPageBitsAuthorName,
   inputPageBitsAuthorAvatar,
   inputSidebarDividerDefault,
@@ -213,6 +219,12 @@ export const createValidation = ({
         return () => inputPageBitsAuthorName;
       case 'page.bits.defaultAuthor.avatar':
         return () => inputPageBitsAuthorAvatar;
+      case 'ui.sidebarActions.showRssLink':
+        return () => inputSidebarActionsShowRssLink;
+      case 'ui.sidebarActions.showThemeToggle':
+        return () => inputSidebarActionsShowThemeToggle;
+      case 'ui.sidebarActions.showAdminEntry':
+        return () => inputSidebarActionsShowAdminEntry;
       case 'ui.articleMeta.showDate':
         return () => inputArticleMetaShowDate;
       case 'ui.articleMeta.dateLabel':

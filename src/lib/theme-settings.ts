@@ -179,6 +179,12 @@ export interface ArticleMetaSettings {
 
 export type ArticleMetaDisplayContext = 'home' | 'list' | 'detail';
 
+export interface SidebarActionsSettings {
+  showRssLink: boolean;
+  showThemeToggle: boolean;
+  showAdminEntry: boolean;
+}
+
 export interface UiSettings {
   codeBlock: {
     showLineNumbers: boolean;
@@ -186,6 +192,7 @@ export interface UiSettings {
   readingMode: {
     showEntry: boolean;
   };
+  sidebarActions: SidebarActionsSettings;
   articleMeta: ArticleMetaSettings;
   layout: {
     sidebarDivider: SidebarDividerVariant;
@@ -250,6 +257,9 @@ export interface ThemeSettingsSources {
   ui: {
     codeBlockShowLineNumbers: SettingSource;
     readingModeShowEntry: SettingSource;
+    sidebarActionsShowRssLink: SettingSource;
+    sidebarActionsShowThemeToggle: SettingSource;
+    sidebarActionsShowAdminEntry: SettingSource;
     articleMetaShowDate: SettingSource;
     articleMetaDateLabel: SettingSource;
     articleMetaShowTags: SettingSource;
@@ -487,6 +497,11 @@ const DEFAULT_UI: UiSettings = {
   },
   readingMode: {
     showEntry: true
+  },
+  sidebarActions: {
+    showRssLink: true,
+    showThemeToggle: true,
+    showAdminEntry: false
   },
   articleMeta: {
     showDate: true,
@@ -1299,6 +1314,7 @@ export const getThemeSettings = (): ThemeSettingsResolved => {
 
   const uiCodeBlock = isRecord(uiJson?.codeBlock) ? uiJson.codeBlock : undefined;
   const uiReadingMode = isRecord(uiJson?.readingMode) ? uiJson.readingMode : undefined;
+  const uiSidebarActions = isRecord(uiJson?.sidebarActions) ? uiJson.sidebarActions : undefined;
   const uiArticleMeta = isRecord(uiJson?.articleMeta) ? uiJson.articleMeta : undefined;
   const uiLayout = isRecord(uiJson?.layout) ? uiJson.layout : undefined;
 
@@ -1311,6 +1327,21 @@ export const getThemeSettings = (): ThemeSettingsResolved => {
     asBoolean(uiReadingMode?.showEntry),
     DEFAULT_UI.readingMode.showEntry,
     DEFAULT_UI.readingMode.showEntry
+  );
+  const showRssLink = resolveValue(
+    asBoolean(uiSidebarActions?.showRssLink),
+    undefined,
+    DEFAULT_UI.sidebarActions.showRssLink
+  );
+  const showThemeToggle = resolveValue(
+    asBoolean(uiSidebarActions?.showThemeToggle),
+    undefined,
+    DEFAULT_UI.sidebarActions.showThemeToggle
+  );
+  const showAdminEntry = resolveValue(
+    asBoolean(uiSidebarActions?.showAdminEntry),
+    undefined,
+    DEFAULT_UI.sidebarActions.showAdminEntry
   );
   const showArticleDate = resolveValue(
     asBoolean(uiArticleMeta?.showDate),
@@ -1436,6 +1467,11 @@ export const getThemeSettings = (): ThemeSettingsResolved => {
         readingMode: {
           showEntry: showReadingEntry.value
         },
+        sidebarActions: {
+          showRssLink: showRssLink.value,
+          showThemeToggle: showThemeToggle.value,
+          showAdminEntry: showAdminEntry.value
+        },
         articleMeta: {
           showDate: showArticleDate.value,
           dateLabel: articleDateLabel.value,
@@ -1498,6 +1534,9 @@ export const getThemeSettings = (): ThemeSettingsResolved => {
       ui: {
         codeBlockShowLineNumbers: showLineNumbers.source,
         readingModeShowEntry: showReadingEntry.source,
+        sidebarActionsShowRssLink: showRssLink.source,
+        sidebarActionsShowThemeToggle: showThemeToggle.source,
+        sidebarActionsShowAdminEntry: showAdminEntry.source,
         articleMetaShowDate: showArticleDate.source,
         articleMetaDateLabel: articleDateLabel.source,
         articleMetaShowTags: showArticleTags.source,
@@ -1581,6 +1620,7 @@ const buildEditableThemeSettingsSnapshot = (
     ui: {
       codeBlock: { ...resolved.settings.ui.codeBlock },
       readingMode: { ...resolved.settings.ui.readingMode },
+      sidebarActions: { ...resolved.settings.ui.sidebarActions },
       articleMeta: { ...resolved.settings.ui.articleMeta },
       layout: { ...resolved.settings.ui.layout }
     }

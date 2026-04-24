@@ -211,10 +211,6 @@
   box-shadow: none;
 }
 
-.admin-social-field--order .admin-field__control:hover {
-  border-color: transparent;
-}
-
 .admin-social-field--order .admin-field__control:focus-visible {
   outline: none;
   box-shadow: none;
@@ -273,28 +269,12 @@
 .admin-social-field--platform select.admin-field__control:focus-visible {
   border-color: var(--admin-focus-border);
   background-color: var(--bg);
-  box-shadow: 0 0 0 2px var(--admin-focus-ring);
+  box-shadow: var(--admin-focus-shadow);
 }
 
 .admin-social-field--href .admin-field__control {
   padding-inline: var(--admin-social-href-padding-inline);
   font-size: var(--admin-social-field-font-size);
-}
-
-.admin-social-field--href .admin-field__control:not([aria-invalid='true']) {
-  border-color: var(--admin-field-soft-border);
-  background: var(--admin-field-soft-bg);
-}
-
-.admin-social-field--href .admin-field__control:not([aria-invalid='true']):hover {
-  border-color: var(--admin-field-soft-hover-border);
-  background: var(--admin-field-soft-hover-bg);
-}
-
-.admin-social-field--href .admin-field__control:not([aria-invalid='true']):focus-visible {
-  border-color: var(--admin-focus-border);
-  background: var(--bg);
-  box-shadow: 0 0 0 2px var(--admin-focus-ring);
 }
 
 .admin-social-field--icon {
@@ -336,8 +316,6 @@
 
 .admin-social-action {
   --admin-btn-icon-glyph-size: var(--admin-social-action-glyph-size);
-
-  color: var(--text);
 }
 
 .admin-social-action[data-state='hidden'] {

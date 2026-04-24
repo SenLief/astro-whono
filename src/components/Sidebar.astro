@@ -28,6 +28,9 @@ const nav = settings.shell.nav
     href: withBase(getSidebarHref(item.id))
   }));
 const showReaderToggle = settings.ui.readingMode.showEntry;
+const showRssLink = settings.ui.sidebarActions.showRssLink;
+const showThemeToggle = settings.ui.sidebarActions.showThemeToggle;
+const showAdminEntry = settings.ui.sidebarActions.showAdminEntry && settings.site.adminOverview.publicVisible;
 ---
 
 <aside class="sidebar">
@@ -76,20 +79,30 @@ const showReaderToggle = settings.ui.readingMode.showEntry;
       </button>
     ) : null}
 
-    <a class="icon-button rss-link" href={withBase('/archive/rss.xml')} aria-label="RSS 订阅" title="RSS 订阅">
-      <UiIcon name="rss" class="icon" />
-    </a>
+    {showRssLink ? (
+      <a class="icon-button rss-link" href={withBase('/archive/rss.xml')} aria-label="RSS 订阅" title="RSS 订阅">
+        <UiIcon name="rss" class="icon" />
+      </a>
+    ) : null}
 
-    <button
-      id="theme-toggle"
-      class="icon-button theme-toggle"
-      type="button"
-      aria-label="夜间模式"
-      aria-pressed="false"
-      title="夜间模式"
-    >
-      <UiIcon name="moon" class="icon icon-moon" />
-      <UiIcon name="sun" class="icon icon-sun" />
-    </button>
+    {showThemeToggle ? (
+      <button
+        id="theme-toggle"
+        class="icon-button theme-toggle"
+        type="button"
+        aria-label="夜间模式"
+        aria-pressed="false"
+        title="夜间模式"
+      >
+        <UiIcon name="moon" class="icon icon-moon" />
+        <UiIcon name="sun" class="icon icon-sun" />
+      </button>
+    ) : null}
+
+    {showAdminEntry ? (
+      <a class="icon-button admin-entry-link" href={withBase('/admin/')} aria-label="站点概览" title="站点概览">
+        <UiIcon name="monitor-dot" class="icon" />
+      </a>
+    ) : null}
   </div>
 </aside>

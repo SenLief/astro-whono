@@ -198,8 +198,7 @@
 }
 
 .admin-data-btn[data-step-state='ready'],
-.admin-data-btn[data-step-state='running'],
-.admin-data-btn[data-step-state='running']:disabled {
+.admin-data-btn[data-step-state='running'] {
   border-color: var(--admin-button-primary-border);
   background: var(--admin-button-primary-bg);
   color: var(--admin-button-primary-text);
@@ -217,8 +216,7 @@
   cursor: progress;
 }
 
-.admin-data-btn[data-step-state='done'],
-.admin-data-btn[data-step-state='done']:disabled {
+.admin-data-btn[data-step-state='done'] {
   border-style: solid;
   border-color: var(--admin-control-border);
   background: var(--admin-control-bg);
@@ -351,7 +349,6 @@
 .admin-data-dropzone {
   --admin-data-dropzone-border-color:
     color-mix(in srgb, var(--admin-data-border-strong) 76%, var(--admin-data-border-soft) 24%);
-  --admin-data-dropzone-border-hover-color: var(--admin-data-dropzone-border-color);
   --admin-data-dropzone-border-drag-color: var(--admin-focus-border);
   --admin-data-dropzone-active-bg: color-mix(in srgb, var(--admin-data-surface-elevated) 88%, var(--bg) 12%);
   position: relative;
@@ -395,7 +392,7 @@
 }
 
 .admin-data-dropzone[data-has-file='false']:not([data-disabled='true']):hover {
-  border-color: var(--admin-data-dropzone-border-hover-color);
+  border-color: var(--admin-data-dropzone-border-color);
 }
 
 .admin-data-dropzone[data-drag-active='true'] {
@@ -403,8 +400,6 @@
 }
 
 .admin-data-dropzone[data-has-file='true'] {
-  --admin-data-dropzone-border-hover-color:
-    color-mix(in srgb, var(--admin-data-dropzone-border-color) 82%, var(--admin-data-border-strong) 18%);
   border-style: solid;
   min-height: 0;
   align-items: stretch;
@@ -414,7 +409,7 @@
 .admin-data-dropzone:focus-within {
   outline: none;
   border-color: var(--admin-focus-border);
-  box-shadow: 0 0 0 2px var(--admin-focus-ring);
+  box-shadow: var(--admin-focus-shadow);
 }
 
 .admin-data-dropzone[data-disabled='true'] {
@@ -598,7 +593,7 @@
 
 .admin-data-dropzone__summary-action:focus-visible {
   border-color: var(--admin-focus-border);
-  box-shadow: 0 0 0 2px var(--admin-focus-ring);
+  box-shadow: var(--admin-focus-shadow);
 }
 
 .admin-data-terminal {

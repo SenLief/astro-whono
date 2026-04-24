@@ -41,10 +41,11 @@ Theme Console 当前适合处理以下几类配置：
 - `/admin/` Overview 对外展示开关与关闭态文案
 - 社交链接及其排序
 - 侧栏站点名、引用文案、导航顺序与显隐
+- 侧栏动作图标（阅读模式 / RSS / 主题切换 / 站点概览入口）
 - 首页 Hero、首页导语及首页内部入口
 - `/essay/`、`/archive/`、`/bits/`、`/memo/`、`/about/` 的主副标题
 - 文章元信息显示选项
-- 代码块行号与阅读模式入口
+- 代码块行号
 
 ## 配置文件
 
@@ -86,6 +87,7 @@ Theme Console 管理的是仓库内的主题配置，相关改动仍可通过 Gi
 - 侧栏站点名
 - 侧栏引用文案
 - 侧栏分隔线样式
+- 侧栏动作图标显隐（阅读模式 / RSS / 主题切换 / 站点概览）
 - 导航名称、排序、后缀字符与显隐状态
 
 ![Sidebar 分组截图](./theme-console/theme-console-sidebar.webp)
@@ -120,10 +122,11 @@ Theme Console 管理的是仓库内的主题配置，相关改动仍可通过 Gi
 ![Inner Pages 分组截图](./theme-console/theme-console-inner-pages.webp)
 
 
-### Reading / Code
+### Code
 
 - 是否在代码块中显示行号
-- 是否在侧栏显示阅读模式入口
+
+阅读模式入口已并入 `Sidebar` 分组的“侧栏图标”模块；`/admin/` 入口仅在 `site.adminOverview.publicVisible = true` 时可启用并在公开站点显示。
 
 
 ## 保存机制

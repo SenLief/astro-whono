@@ -73,18 +73,18 @@
   --admin-status-info-bg: color-mix(in srgb, var(--admin-status-info-accent) 10%, var(--panel) 90%);
   --admin-status-info-border: color-mix(in srgb, var(--admin-status-info-accent) 28%, var(--border) 72%);
   --admin-status-info-text: color-mix(in srgb, var(--admin-status-info-accent) 54%, var(--text) 46%);
-  --admin-status-success-bg: color-mix(in srgb, var(--admin-status-success-accent) 10%, var(--panel) 90%);
-  --admin-status-success-border: color-mix(in srgb, var(--admin-status-success-accent) 28%, var(--border) 72%);
-  --admin-status-success-text: color-mix(in srgb, var(--admin-status-success-accent) 56%, var(--text) 44%);
+  --admin-status-success-bg: color-mix(in srgb, var(--admin-status-success-accent) 14%, var(--panel) 86%);
+  --admin-status-success-border: color-mix(in srgb, var(--admin-status-success-accent) 38%, var(--border) 62%);
+  --admin-status-success-text: color-mix(in srgb, var(--admin-status-success-accent) 68%, var(--text) 32%);
   --admin-status-warning-bg: color-mix(in srgb, var(--admin-status-warning-accent) 12%, var(--panel) 88%);
   --admin-status-warning-border: color-mix(in srgb, var(--admin-status-warning-accent) 30%, var(--border) 70%);
   --admin-status-warning-text: color-mix(in srgb, var(--admin-status-warning-accent) 58%, var(--text) 42%);
   --admin-status-danger-bg: color-mix(in srgb, var(--admin-status-danger-accent) 11%, var(--panel) 89%);
   --admin-status-danger-border: color-mix(in srgb, var(--admin-status-danger-accent) 32%, var(--border) 68%);
   --admin-status-danger-text: color-mix(in srgb, var(--admin-status-danger-accent) 62%, var(--text) 38%);
-  --admin-status-loading-bg: #78716c;
+  --admin-status-loading-bg: var(--admin-status-neutral-accent);
   --admin-status-ready-bg: #2f9f62;
-  --admin-status-ok-bg: #4f7354;
+  --admin-status-ok-bg: var(--admin-status-success-accent);
   --admin-status-warn-bg: #1f1f1f;
   --admin-status-error-bg: #7f1d1d;
   --admin-status-icon-fg: #f8f4eb;
@@ -93,13 +93,13 @@
   --admin-error-text: #2a2321;
   --admin-error-muted: #685d5b;
   --admin-error-accent: #a84f4b;
-  --admin-error-icon-bg: rgba(168, 79, 75, 0.14);
-  --admin-error-surface: rgba(255, 255, 255, 0.72);
   --admin-error-surface-border: rgba(90, 73, 71, 0.14);
   --admin-error-code-bg: rgba(64, 49, 48, 0.04);
   --admin-error-shadow: rgba(56, 40, 38, 0.14);
   --admin-focus-border: color-mix(in srgb, var(--text) 68%, var(--border) 32%);
   --admin-focus-ring: color-mix(in srgb, var(--text) 16%, transparent);
+  --admin-focus-shadow: 0 0 0 2px var(--admin-focus-ring);
+  --admin-field-invalid-focus-shadow: 0 0 0 2px color-mix(in srgb, var(--admin-focus-ring) 56%, var(--admin-field-invalid-ring) 44%);
   --admin-font-ui:
     "Microsoft YaHei UI",
     "Microsoft YaHei",
@@ -126,7 +126,6 @@
   --admin-status-success-accent: #86a98c;
   --admin-status-warning-accent: #b2a06f;
   --admin-status-danger-accent: #c08d88;
-  --admin-status-loading-bg: #908a84;
   --admin-status-ready-bg: #52b77e;
   --admin-status-ok-bg: #5d7f61;
   --admin-status-warn-bg: #0f0f10;
@@ -137,8 +136,6 @@
   --admin-error-text: #f0e8e3;
   --admin-error-muted: #b3aeaa;
   --admin-error-accent: #cc938d;
-  --admin-error-icon-bg: rgba(215, 154, 149, 0.16);
-  --admin-error-surface: rgba(255, 255, 255, 0.018);
   --admin-error-surface-border: rgba(255, 255, 255, 0.06);
   --admin-error-code-bg: rgba(255, 255, 255, 0.04);
   --admin-error-shadow: rgba(0, 0, 0, 0.18);
@@ -665,16 +662,32 @@
   box-shadow: none;
 }
 
+.admin-field:not(.is-invalid) .admin-field__control--soft:not([aria-invalid='true']) {
+  border-color: var(--admin-field-soft-border);
+  background: var(--admin-field-soft-bg);
+}
+
+.admin-field:not(.is-invalid) .admin-field__control--soft:not([aria-invalid='true']):hover {
+  border-color: var(--admin-field-soft-hover-border);
+  background: var(--admin-field-soft-hover-bg);
+}
+
 .admin-field__control:focus-visible {
   outline: none;
   border-color: var(--admin-focus-border);
-  box-shadow: 0 0 0 2px var(--admin-focus-ring);
+  box-shadow: var(--admin-focus-shadow);
+}
+
+.admin-field:not(.is-invalid) .admin-field__control--soft:not([aria-invalid='true']):focus-visible {
+  border-color: var(--admin-focus-border);
+  background: var(--bg);
+  box-shadow: var(--admin-focus-shadow);
 }
 
 .admin-field__control[aria-invalid='true']:focus-visible,
 .admin-field.is-invalid .admin-field__control:focus-visible {
   border-color: var(--admin-field-invalid-border);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--admin-focus-ring) 56%, var(--admin-field-invalid-ring) 44%);
+  box-shadow: var(--admin-field-invalid-focus-shadow);
 }
 
 .admin-toggle-row {
@@ -683,6 +696,10 @@
   gap: 8px;
   min-height: 36px;
   font-size: 14px;
+}
+
+.admin-toggle-row[aria-disabled='true'] {
+  opacity: 0.62;
 }
 
 .admin-toggle-row--compact {
@@ -1110,7 +1127,7 @@
   outline: none;
   outline-offset: 1px;
   border-color: var(--admin-focus-border);
-  box-shadow: 0 0 0 2px var(--admin-focus-ring);
+  box-shadow: var(--admin-focus-shadow);
 }
 
 .admin-btn--primary:not(:disabled) {

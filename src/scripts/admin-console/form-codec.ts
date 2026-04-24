@@ -91,6 +91,10 @@ type FormCodecContext = {
   inputHeroImageAlt: HTMLInputElement;
   inputCodeLineNumbers: HTMLInputElement;
   inputReadingEntry: HTMLInputElement;
+  inputSidebarActionsShowRssLink: HTMLInputElement;
+  inputSidebarActionsShowThemeToggle: HTMLInputElement;
+  inputSidebarActionsShowAdminEntry: HTMLInputElement;
+  sidebarAdminEntryRowEl: HTMLElement;
   inputSidebarDividerDefault: HTMLInputElement;
   inputSidebarDividerSubtle: HTMLInputElement;
   inputSidebarDividerNone: HTMLInputElement;
@@ -194,6 +198,10 @@ export const createFormCodec = ({
   inputHeroImageAlt,
   inputCodeLineNumbers,
   inputReadingEntry,
+  inputSidebarActionsShowRssLink,
+  inputSidebarActionsShowThemeToggle,
+  inputSidebarActionsShowAdminEntry,
+  sidebarAdminEntryRowEl,
   inputSidebarDividerDefault,
   inputSidebarDividerSubtle,
   inputSidebarDividerNone
@@ -240,6 +248,12 @@ export const createFormCodec = ({
 
   const syncAdminOverviewControls = (): void => {
     inputSiteAdminOverviewHiddenMessage.disabled = inputSiteAdminOverviewPublicVisible.checked;
+  };
+
+  const syncSidebarActionControls = (): void => {
+    const adminOverviewPublicVisible = Boolean(inputSiteAdminOverviewPublicVisible.checked);
+    inputSidebarActionsShowAdminEntry.disabled = !adminOverviewPublicVisible;
+    sidebarAdminEntryRowEl.setAttribute('aria-disabled', String(!adminOverviewPublicVisible));
   };
 
   const collectHomeIntroLinks = (): HomeIntroLinkKey[] => {
@@ -483,6 +497,11 @@ export const createFormCodec = ({
         readingMode: {
           showEntry: Boolean(inputReadingEntry.checked)
         },
+        sidebarActions: {
+          showRssLink: Boolean(inputSidebarActionsShowRssLink.checked),
+          showThemeToggle: Boolean(inputSidebarActionsShowThemeToggle.checked),
+          showAdminEntry: Boolean(inputSidebarActionsShowAdminEntry.checked)
+        },
         articleMeta: {
           showDate: Boolean(inputArticleMetaShowDate.checked),
           dateLabel: normalizeSingleLine(inputArticleMetaDateLabel.value),
@@ -555,6 +574,10 @@ export const createFormCodec = ({
     syncFooterYearControls();
     inputCodeLineNumbers.checked = Boolean(settings.ui?.codeBlock?.showLineNumbers);
     inputReadingEntry.checked = Boolean(settings.ui?.readingMode?.showEntry);
+    inputSidebarActionsShowRssLink.checked = settings.ui?.sidebarActions?.showRssLink !== false;
+    inputSidebarActionsShowThemeToggle.checked = settings.ui?.sidebarActions?.showThemeToggle !== false;
+    inputSidebarActionsShowAdminEntry.checked = Boolean(settings.ui?.sidebarActions?.showAdminEntry);
+    syncSidebarActionControls();
     inputArticleMetaShowDate.checked = settings.ui?.articleMeta?.showDate !== false;
     inputArticleMetaDateLabel.value = settings.ui?.articleMeta?.dateLabel ?? ADMIN_ARTICLE_META_DATE_LABEL_DEFAULT;
     inputArticleMetaShowTags.checked = settings.ui?.articleMeta?.showTags !== false;
@@ -588,6 +611,7 @@ export const createFormCodec = ({
     refreshArticleMetaPreview,
     refreshHomeIntroPreview,
     syncAdminOverviewControls,
+    syncSidebarActionControls,
     syncHomeIntroLinkControls,
     syncHeroControls,
     refreshFooterPreview,

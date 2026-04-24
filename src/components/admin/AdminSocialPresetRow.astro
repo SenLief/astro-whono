@@ -65,7 +65,7 @@ const removeLabel = `${row.label} 为固定项，不可删除`;
   <label class="admin-field admin-social-field admin-social-field--href">
     <span class="admin-social-cell-label">{row.id === 'email' ? '邮箱地址' : '链接地址'}</span>
     <input
-      class="admin-field__control"
+      class="admin-field__control admin-field__control--soft"
       id={row.inputId}
       data-social-preset-field="href"
       type={row.inputType}

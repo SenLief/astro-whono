@@ -8,6 +8,7 @@
   --admin-nav-header-padding-inline: var(--admin-row-table-padding-inline);
   --admin-nav-header-font-size: var(--admin-text-xs);
   --admin-nav-header-line-height: normal;
+  --admin-nav-row-padding-block: var(--admin-row-table-padding-block);
   --admin-nav-row-padding-inline: var(--admin-row-table-padding-inline);
   --admin-nav-id-font-size: var(--admin-text-sm);
   --admin-nav-name-control-max-width: none;
@@ -17,6 +18,7 @@
   --admin-nav-ornament-padding-inline: var(--admin-field-padding-inline);
   --admin-nav-ornament-text-align: start;
   --admin-nav-ornament-justify-items: stretch;
+  --admin-nav-toggle-min-height: 36px;
   --admin-nav-toggle-justify-self: center;
   display: grid;
   gap: 0;
@@ -53,6 +55,7 @@
   --admin-nav-header-padding-inline: 10px;
   --admin-nav-header-font-size: var(--admin-text-2xs);
   --admin-nav-header-line-height: 1.35;
+  --admin-nav-row-padding-block: 8px;
   --admin-nav-row-padding-inline: 10px;
   --admin-nav-id-font-size: var(--admin-text-xs);
   --admin-nav-name-control-max-width: 10ch;
@@ -62,6 +65,7 @@
   --admin-nav-ornament-padding-inline: 8px;
   --admin-nav-ornament-text-align: center;
   --admin-nav-ornament-justify-items: center;
+  --admin-nav-toggle-min-height: 38px;
   --admin-nav-toggle-justify-self: stretch;
 }
 
@@ -69,6 +73,7 @@
   border: 0;
   border-top: 1px solid var(--admin-row-divider);
   border-radius: 0;
+  padding-block: var(--admin-nav-row-padding-block);
   padding-inline: var(--admin-nav-row-padding-inline);
 }
 
@@ -131,25 +136,6 @@
   text-align: var(--admin-nav-ornament-text-align);
 }
 
-.admin-nav-field--name .admin-field__control:not([aria-invalid='true']),
-.admin-nav-field--ornament .admin-field__control:not([aria-invalid='true']) {
-  border-color: var(--admin-field-soft-border);
-  background: var(--admin-field-soft-bg);
-}
-
-.admin-nav-field--name .admin-field__control:not([aria-invalid='true']):hover,
-.admin-nav-field--ornament .admin-field__control:not([aria-invalid='true']):hover {
-  border-color: var(--admin-field-soft-hover-border);
-  background: var(--admin-field-soft-hover-bg);
-}
-
-.admin-nav-field--name .admin-field__control:not([aria-invalid='true']):focus-visible,
-.admin-nav-field--ornament .admin-field__control:not([aria-invalid='true']):focus-visible {
-  border-color: var(--admin-focus-border);
-  background: var(--bg);
-  box-shadow: 0 0 0 2px var(--admin-focus-ring);
-}
-
 .admin-nav-field--order .admin-field__control {
   width: 2.8ch;
   min-width: 0;
@@ -166,16 +152,13 @@
   min-width: 0;
 }
 
-.admin-nav-field--order .admin-field__control:hover {
-  border-color: transparent;
-}
-
 .admin-nav-field--order .admin-field__control:focus-visible {
   outline: none;
   box-shadow: none;
 }
 
 .admin-nav-row .admin-toggle {
+  min-height: var(--admin-nav-toggle-min-height);
   justify-self: var(--admin-nav-toggle-justify-self);
 }
 

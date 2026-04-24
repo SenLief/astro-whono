@@ -122,25 +122,31 @@ describe('admin-console/shared', () => {
     );
   });
 
-  it('fills the admin overview defaults for legacy settings snapshots', () => {
+  it('fills compatibility defaults for legacy admin overview and sidebar action snapshots', () => {
     const canonical = getEditableThemeSettingsPayload().settings;
     const legacySnapshot = structuredClone(canonical) as Record<string, any>;
     delete legacySnapshot.site.adminOverview;
+    legacySnapshot.ui.sidebarActions = {
+      showThemeToggle: canonical.ui.sidebarActions.showThemeToggle
+    };
 
     const compatible = fillAdminThemeSettingsCompatibilityDefaults(
       legacySnapshot,
       canonical
     ) as Record<string, any>;
 
-    expect(
-      createAdminThemeSettingsCanonicalMismatchIssues(compatible, canonical).map((issue) => issue.path)
-    ).not.toContain('site.adminOverview');
+    const mismatchPaths = createAdminThemeSettingsCanonicalMismatchIssues(compatible, canonical).map((issue) => issue.path);
+    expect(mismatchPaths).not.toContain('site.adminOverview');
+    expect(mismatchPaths).not.toContain('ui.sidebarActions');
+    expect(mismatchPaths).not.toContain('ui.sidebarActions.showRssLink');
+    expect(mismatchPaths).not.toContain('ui.sidebarActions.showAdminEntry');
   });
 
   it('validates admin overview public display settings', () => {
     const settings = structuredClone(getEditableThemeSettingsPayload().settings);
     settings.site.adminOverview.publicVisible = false;
     settings.site.adminOverview.hiddenMessage = '暂未公开';
+    settings.ui.sidebarActions.showAdminEntry = true;
 
     expect(validateAdminThemeSettings(settings)).toEqual([]);
 

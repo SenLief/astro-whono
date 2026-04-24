@@ -109,13 +109,23 @@
 
 .admin-sidebar-layout__main {
   display: grid;
-  gap: 22px;
+  gap: 10px;
   min-width: 0;
 }
 
 .admin-subgroup.admin-subgroup--sidebar-nav {
   margin-top: 0;
   min-width: 0;
+}
+
+.admin-subgroup.admin-subgroup--sidebar-icons {
+  display: grid;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.admin-subgroup.admin-subgroup--sidebar-icons > .admin-subtitle {
+  margin-bottom: 0;
 }
 
 .admin-subgroup.admin-subgroup--sidebar-nav > .admin-subtitle {
@@ -451,7 +461,7 @@
 .admin-segmented__option input:focus-visible + span {
   outline: none;
   border-color: var(--admin-focus-border);
-  box-shadow: 0 0 0 2px var(--admin-focus-ring);
+  box-shadow: var(--admin-focus-shadow);
 }
 
 .admin-label__main code {
@@ -481,7 +491,7 @@
 .admin-title-pair:focus-within {
   outline: none;
   border-color: var(--admin-focus-border);
-  box-shadow: 0 0 0 2px var(--admin-focus-ring);
+  box-shadow: var(--admin-focus-shadow);
 }
 
 .admin-title-pair:has(.admin-title-pair__input[aria-invalid='true']) {
@@ -491,7 +501,7 @@
 
 .admin-title-pair:has(.admin-title-pair__input[aria-invalid='true']):focus-within {
   border-color: var(--admin-field-invalid-border);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--admin-focus-ring) 56%, var(--admin-field-invalid-ring) 44%);
+  box-shadow: var(--admin-field-invalid-focus-shadow);
 }
 
 .admin-title-pair__input {
@@ -709,6 +719,81 @@
   gap: 8px;
 }
 
+.admin-sidebar-icon-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.admin-sidebar-icon-toggle {
+  --admin-control-height-compact: 30px;
+  --admin-control-icon-size-compact: 30px;
+  --admin-control-glyph-size-compact: 16px;
+  --admin-sidebar-icon-color: var(--muted);
+  --admin-sidebar-icon-border: color-mix(in srgb, var(--muted) 34%, transparent);
+  --admin-sidebar-icon-color-active: color-mix(in srgb, var(--muted) 92%, var(--text) 8%);
+  --admin-sidebar-icon-border-active: color-mix(in srgb, var(--muted) 54%, transparent);
+  --admin-sidebar-icon-bg-active: color-mix(in srgb, var(--admin-control-bg-hover) 92%, var(--muted) 8%);
+
+  position: relative;
+  display: inline-grid;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.admin-sidebar-icon-toggle[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.admin-sidebar-icon-toggle input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.admin-sidebar-icon-toggle .admin-sidebar-icon-toggle__button {
+  position: relative;
+  border-color: var(--admin-sidebar-icon-border);
+  background: transparent;
+  color: var(--admin-sidebar-icon-color);
+  pointer-events: none;
+}
+
+.admin-sidebar-icon-toggle__button svg {
+  flex: 0 0 auto;
+}
+
+.admin-sidebar-icon-toggle:hover .admin-sidebar-icon-toggle__button {
+  border-color: var(--admin-control-border-hover);
+  background: var(--admin-control-bg-hover);
+  color: var(--text);
+}
+
+.admin-sidebar-icon-toggle input:checked + .admin-sidebar-icon-toggle__button {
+  border-color: var(--admin-sidebar-icon-border-active);
+  background: var(--admin-sidebar-icon-bg-active);
+  color: var(--admin-sidebar-icon-color-active);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--admin-sidebar-icon-color-active) 16%, transparent);
+}
+
+.admin-sidebar-icon-toggle input:focus-visible + .admin-sidebar-icon-toggle__button {
+  outline: none;
+  border-color: var(--admin-focus-border);
+  box-shadow: var(--admin-focus-shadow);
+}
+
+.admin-sidebar-icon-toggle input:disabled + .admin-sidebar-icon-toggle__button,
+.admin-sidebar-icon-toggle[aria-disabled='true'] .admin-sidebar-icon-toggle__button {
+  border-color: color-mix(in srgb, var(--admin-control-border) 72%, transparent);
+  background: var(--admin-control-bg-disabled);
+  color: var(--admin-control-text-disabled);
+  opacity: 0.68;
+}
+
 .admin-toggle-row-group {
   display: flex;
   flex-wrap: wrap;
@@ -767,12 +852,12 @@
 .admin-inline-field__input:focus-visible {
   outline: none;
   border-color: var(--admin-focus-border);
-  box-shadow: 0 0 0 2px var(--admin-focus-ring);
+  box-shadow: var(--admin-focus-shadow);
 }
 
 .admin-inline-field__input[aria-invalid='true']:focus-visible {
   border-color: var(--admin-field-invalid-border);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--admin-focus-ring) 56%, var(--admin-field-invalid-ring) 44%);
+  box-shadow: var(--admin-field-invalid-focus-shadow);
 }
 
 .admin-actions {

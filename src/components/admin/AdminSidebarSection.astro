@@ -1,5 +1,6 @@
 ---
 import AdminIcon from './AdminIcon.astro';
+import UiIcon from '../UiIcon.astro';
 import type { SidebarNavId } from '../../lib/theme-settings';
 import {
   ADMIN_NAV_ORNAMENT_DEFAULT,
@@ -36,7 +37,7 @@ const { navIdOrder } = Astro.props;
           <span class="admin-label__main">侧栏引用文案</span>
           <span class="admin-label__hint">（支持换行显示）</span>
         </span>
-        <textarea class="admin-field__control" id="shell-quote" rows="5"></textarea>
+        <textarea class="admin-field__control" id="shell-quote" rows="4"></textarea>
       </label>
       <div class="admin-field admin-field--sidebar-divider">
         <span class="admin-label">
@@ -58,6 +59,71 @@ const { navIdOrder } = Astro.props;
               </label>
             ))
           }
+        </div>
+      </div>
+
+      <div class="admin-subgroup admin-subgroup--sidebar-icons">
+        <p class="admin-subtitle">
+          <span class="admin-subtitle__main">侧栏图标</span>
+          <span class="admin-subtitle__hint">（选择底部显示的图标）</span>
+        </p>
+        <div class="admin-sidebar-icon-grid" role="group" aria-label="侧栏图标显隐">
+          <label class="admin-sidebar-icon-toggle" for="ui-reading-entry" title="显示阅读模式入口">
+            <input id="ui-reading-entry" type="checkbox" aria-label="显示阅读模式入口" title="显示阅读模式入口" />
+            <span
+              class="admin-btn admin-btn--tool admin-btn--compact admin-btn--icon admin-sidebar-icon-toggle__button"
+              aria-hidden="true"
+            >
+              <UiIcon name="book-open" size={18} strokeWidth={2} />
+            </span>
+          </label>
+          <label class="admin-sidebar-icon-toggle" for="ui-sidebar-actions-show-rss-link" title="显示 RSS 入口">
+            <input
+              id="ui-sidebar-actions-show-rss-link"
+              type="checkbox"
+              aria-label="显示 RSS 入口"
+              title="显示 RSS 入口"
+            />
+            <span
+              class="admin-btn admin-btn--tool admin-btn--compact admin-btn--icon admin-sidebar-icon-toggle__button"
+              aria-hidden="true"
+            >
+              <UiIcon name="rss" size={18} strokeWidth={2} />
+            </span>
+          </label>
+          <label class="admin-sidebar-icon-toggle" for="ui-sidebar-actions-show-theme-toggle" title="显示主题切换入口">
+            <input
+              id="ui-sidebar-actions-show-theme-toggle"
+              type="checkbox"
+              aria-label="显示主题切换入口"
+              title="显示主题切换入口"
+            />
+            <span
+              class="admin-btn admin-btn--tool admin-btn--compact admin-btn--icon admin-sidebar-icon-toggle__button"
+              aria-hidden="true"
+            >
+              <UiIcon name="moon" size={17} strokeWidth={2} />
+            </span>
+          </label>
+          <label
+            id="ui-sidebar-actions-show-admin-entry-row"
+            class="admin-sidebar-icon-toggle"
+            for="ui-sidebar-actions-show-admin-entry"
+            title="显示站点概览入口（/admin/）"
+          >
+            <input
+              id="ui-sidebar-actions-show-admin-entry"
+              type="checkbox"
+              aria-label="显示 /admin/ 入口"
+              title="显示站点概览入口（/admin/）"
+            />
+            <span
+              class="admin-btn admin-btn--tool admin-btn--compact admin-btn--icon admin-sidebar-icon-toggle__button"
+              aria-hidden="true"
+            >
+              <UiIcon name="monitor-dot" size={18} strokeWidth={2} />
+            </span>
+          </label>
         </div>
       </div>
     </div>
@@ -106,7 +172,7 @@ const { navIdOrder } = Astro.props;
                 <span class="admin-nav-cell-label">导航名称</span>
                 <span class="sr-only">{id} 导航名称</span>
                 <input
-                  class="admin-field__control"
+                  class="admin-field__control admin-field__control--soft"
                   data-nav-field="label"
                   name={`shell-nav-${id}-label`}
                   type="text"
@@ -117,7 +183,7 @@ const { navIdOrder } = Astro.props;
                 <span class="admin-nav-cell-label">导航后缀</span>
                 <span class="sr-only">{id} 导航后缀，留空表示不显示</span>
                 <input
-                  class="admin-field__control"
+                  class="admin-field__control admin-field__control--soft"
                   data-nav-field="ornament"
                   name={`shell-nav-${id}-ornament`}
                   type="text"

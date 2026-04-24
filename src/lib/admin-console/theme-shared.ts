@@ -385,6 +385,7 @@ export const canonicalizeAdminThemeSettings = (
   const bitsDefaultAuthor = isRecord(bitsPage.defaultAuthor) ? bitsPage.defaultAuthor : {};
   const rawPresetOrder = isRecord(socialLinks.presetOrder) ? socialLinks.presetOrder : {};
   const rawUiArticleMeta: LooseRecord = isRecord(ui.articleMeta) ? ui.articleMeta : {};
+  const rawUiSidebarActions: LooseRecord = isRecord(ui.sidebarActions) ? ui.sidebarActions : {};
   const rawUiLayout: LooseRecord = isRecord(ui.layout) ? ui.layout : {};
   const rawHeroPresetId = normalizeTrimmed(home.heroPresetId);
   const heroPresetId = isAdminHeroPresetId(rawHeroPresetId) ? rawHeroPresetId : 'default';
@@ -534,6 +535,15 @@ export const canonicalizeAdminThemeSettings = (
       readingMode: {
         showEntry: Boolean(isRecord(ui.readingMode) ? ui.readingMode.showEntry : false)
       },
+      sidebarActions: {
+        showRssLink: typeof rawUiSidebarActions.showRssLink === 'boolean' ? rawUiSidebarActions.showRssLink : true,
+        showThemeToggle: typeof rawUiSidebarActions.showThemeToggle === 'boolean'
+          ? rawUiSidebarActions.showThemeToggle
+          : true,
+        showAdminEntry: typeof rawUiSidebarActions.showAdminEntry === 'boolean'
+          ? rawUiSidebarActions.showAdminEntry
+          : false
+      },
       articleMeta: {
         showDate: typeof rawUiArticleMeta.showDate === 'boolean' ? rawUiArticleMeta.showDate : true,
         dateLabel: normalizeSingleLine(rawUiArticleMeta.dateLabel, ADMIN_ARTICLE_META_DATE_LABEL_DEFAULT),
@@ -600,6 +610,7 @@ export const createAdminWritableThemeSettingsGroups = (
   ui: {
     codeBlock: { ...settings.ui.codeBlock },
     readingMode: { ...settings.ui.readingMode },
+    sidebarActions: { ...settings.ui.sidebarActions },
     articleMeta: { ...settings.ui.articleMeta },
     layout: { ...settings.ui.layout }
   }
@@ -941,6 +952,18 @@ export const validateAdminThemeSettings = (
     pushIssue('ui.articleMeta.showReadingTime', '文章元信息里的“显示阅读时长”必须是布尔值');
   }
 
+  if (typeof settings.ui?.sidebarActions?.showRssLink !== 'boolean') {
+    pushIssue('ui.sidebarActions.showRssLink', '侧栏图标里的“显示 RSS 入口”必须是布尔值');
+  }
+
+  if (typeof settings.ui?.sidebarActions?.showThemeToggle !== 'boolean') {
+    pushIssue('ui.sidebarActions.showThemeToggle', '侧栏图标里的“显示主题切换入口”必须是布尔值');
+  }
+
+  if (typeof settings.ui?.sidebarActions?.showAdminEntry !== 'boolean') {
+    pushIssue('ui.sidebarActions.showAdminEntry', '侧栏图标里的“显示 /admin/ 入口”必须是布尔值');
+  }
+
   if (!isAdminSidebarDividerVariant(settings.ui?.layout?.sidebarDivider ?? '')) {
     pushIssue('ui.layout.sidebarDivider', '侧栏分隔线只允许 默认 / 弱化 / 隐藏');
   }
@@ -1140,27 +1163,69 @@ const fillAdminThemeSettingsSiteCompatibilityDefaults = (
   };
 };
 
+const fillAdminThemeSettingsUiCompatibilityDefaults = (
+  rawUi: LooseRecord,
+  canonicalUi: LooseRecord
+): LooseRecord => {
+  const canonicalSidebarActions = canonicalUi.sidebarActions;
+  if (!isRecord(canonicalSidebarActions)) return rawUi;
+
+  const rawSidebarActions = rawUi.sidebarActions;
+  if (rawSidebarActions === undefined) {
+    return {
+      ...rawUi,
+      sidebarActions: canonicalSidebarActions
+    };
+  }
+
+  if (!isRecord(rawSidebarActions)) return rawUi;
+
+  return {
+    ...rawUi,
+    sidebarActions: {
+      showRssLink: canonicalSidebarActions.showRssLink,
+      showThemeToggle: canonicalSidebarActions.showThemeToggle,
+      showAdminEntry: canonicalSidebarActions.showAdminEntry,
+      ...rawSidebarActions
+    }
+  };
+};
+
 export const fillAdminThemeSettingsGroupCompatibilityDefaults = (
   group: ThemeSettingsFileGroup,
   rawGroup: unknown,
   canonicalGroup: unknown
 ): unknown => {
-  if (group !== 'site' || !isRecord(rawGroup) || !isRecord(canonicalGroup)) return rawGroup;
-  return fillAdminThemeSettingsSiteCompatibilityDefaults(rawGroup, canonicalGroup);
+  if (!isRecord(rawGroup) || !isRecord(canonicalGroup)) return rawGroup;
+  if (group === 'site') return fillAdminThemeSettingsSiteCompatibilityDefaults(rawGroup, canonicalGroup);
+  if (group === 'ui') return fillAdminThemeSettingsUiCompatibilityDefaults(rawGroup, canonicalGroup);
+  return rawGroup;
 };
 
 export const fillAdminThemeSettingsCompatibilityDefaults = (
   settings: unknown,
   canonicalSettings: EditableThemeSettings
 ): unknown => {
-  if (!isRecord(settings) || !isRecord(settings.site)) return settings;
+  if (!isRecord(settings)) return settings;
 
   return {
     ...settings,
-    site: fillAdminThemeSettingsSiteCompatibilityDefaults(
-      settings.site,
-      canonicalSettings.site as unknown as LooseRecord
-    )
+    ...(isRecord(settings.site)
+      ? {
+          site: fillAdminThemeSettingsSiteCompatibilityDefaults(
+            settings.site,
+            canonicalSettings.site as unknown as LooseRecord
+          )
+        }
+      : {}),
+    ...(isRecord(settings.ui)
+      ? {
+          ui: fillAdminThemeSettingsUiCompatibilityDefaults(
+            settings.ui,
+            canonicalSettings.ui as unknown as LooseRecord
+          )
+        }
+      : {})
   };
 };
 

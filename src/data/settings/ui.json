@@ -5,6 +5,11 @@
   "readingMode": {
     "showEntry": true
   },
+  "sidebarActions": {
+    "showRssLink": true,
+    "showThemeToggle": true,
+    "showAdminEntry": false
+  },
   "articleMeta": {
     "showDate": true,
     "dateLabel": "发布于：",
