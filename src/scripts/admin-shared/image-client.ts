@@ -40,8 +40,11 @@ export const isRecord = (value: unknown): value is Record<string, unknown> =>
 export const isNullableString = (value: unknown): value is string | null => value === null || typeof value === 'string';
 export const isNullableNumber = (value: unknown): value is number | null => value === null || typeof value === 'number';
 
-const parsePositiveInteger = (value: unknown, fallback: number): number =>
-  typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : fallback;
+const isPositiveInteger = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value > 0;
+
+const isNonNegativeInteger = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0;
 
 export const formatAdminImageBytes = (size: number | null): string => {
   if (!size || size <= 0) return '大小未知';
@@ -89,6 +92,14 @@ const isAdminImageClientItem = (item: unknown): item is AdminImageClientItem =>
   && isNullableString(item.mimeType)
   && isNullableString(item.previewSrc);
 
+const parseAdminImageClientItem = (item: unknown): AdminImageClientItem => {
+  if (!isAdminImageClientItem(item)) {
+    throw new Error('图片列表响应格式无效');
+  }
+
+  return item;
+};
+
 export const isAdminImageClientMeta = (meta: unknown): meta is AdminImageClientMeta =>
   isRecord(meta)
   && (meta.kind === 'local' || meta.kind === 'remote')
@@ -102,22 +113,28 @@ export const isAdminImageClientMeta = (meta: unknown): meta is AdminImageClientM
   && isNullableString(meta.previewSrc);
 
 export const parseAdminImageListResponse = (payload: unknown): AdminImageListPage<AdminImageClientItem> => {
-  if (!isRecord(payload) || !isRecord(payload.result) || !Array.isArray(payload.result.items)) {
+  if (!isRecord(payload) || payload.ok !== true || !isRecord(payload.result) || !Array.isArray(payload.result.items)) {
+    throw new Error('图片列表响应格式无效');
+  }
+
+  if (
+    !isPositiveInteger(payload.result.page)
+    || !isPositiveInteger(payload.result.totalPages)
+    || !isNonNegativeInteger(payload.result.totalCount)
+  ) {
     throw new Error('图片列表响应格式无效');
   }
 
   return {
-    items: payload.result.items.filter(isAdminImageClientItem),
-    page: parsePositiveInteger(payload.result.page, 1),
-    totalPages: parsePositiveInteger(payload.result.totalPages, 1),
-    totalCount: typeof payload.result.totalCount === 'number' && payload.result.totalCount >= 0
-      ? payload.result.totalCount
-      : 0
+    items: payload.result.items.map(parseAdminImageClientItem),
+    page: payload.result.page,
+    totalPages: payload.result.totalPages,
+    totalCount: payload.result.totalCount
   };
 };
 
 export const parseAdminImageMetaResponse = (payload: unknown): AdminImageClientMeta => {
-  if (!isRecord(payload) || !isRecord(payload.result) || !isAdminImageClientMeta(payload.result)) {
+  if (!isRecord(payload) || payload.ok !== true || !isRecord(payload.result) || !isAdminImageClientMeta(payload.result)) {
     throw new Error('图片元数据响应格式无效');
   }
 

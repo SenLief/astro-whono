@@ -12,8 +12,7 @@ import {
   isAdminImageScopeKey
 } from '../../lib/admin-console/image-contract';
 import {
-  normalizeAdminImageBrowseGroup,
-  normalizeAdminImageBrowseSubgroup
+  normalizeAdminImageBrowseGroup
 } from '../../lib/admin-console/image-browse';
 import {
   DEFAULT_GROUP,
@@ -23,11 +22,18 @@ import {
   type AdminImageFilterOption,
   type AdminImageListItem,
   type AdminImageListResponse,
+  type AdminImageScope,
   type AdminImageState
 } from './types';
 
 const parsePositiveInteger = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : fallback;
+
+const isPositiveInteger = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value > 0;
+
+const isNonNegativeInteger = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0;
 
 export const toBrowseItem = (item: AdminImageListItem): AdminImageBrowseItem => ({
   path: item.path,
@@ -55,14 +61,25 @@ export const toCachedMeta = (item: AdminImageListItem): AdminImageClientMeta => 
   previewSrc: item.previewSrc
 });
 
-const parseFilterOptions = (payload: unknown): AdminImageFilterOption[] => {
-  if (!Array.isArray(payload)) return [];
+const LIST_RESPONSE_FORMAT_ERROR = '图片列表响应格式无效';
 
-  return payload.filter((item): item is AdminImageFilterOption => {
-    if (!isRecord(item)) return false;
-    return typeof item.value === 'string'
-      && typeof item.label === 'string'
-      && typeof item.count === 'number';
+const isFilterOption = (item: unknown): item is AdminImageFilterOption =>
+  isRecord(item)
+  && typeof item.value === 'string'
+  && typeof item.label === 'string'
+  && typeof item.count === 'number';
+
+const parseFilterOptions = (payload: unknown): AdminImageFilterOption[] => {
+  if (!Array.isArray(payload)) {
+    throw new Error(LIST_RESPONSE_FORMAT_ERROR);
+  }
+
+  return payload.map((item) => {
+    if (!isFilterOption(item)) {
+      throw new Error(LIST_RESPONSE_FORMAT_ERROR);
+    }
+
+    return item;
   });
 };
 
@@ -101,29 +118,52 @@ const isListItem = (item: unknown): item is AdminImageListItem =>
   && isNullableNumber(item.size)
   && isNullableString(item.mimeType);
 
-const parseListResult = (result: unknown): AdminImageListResponse => {
-  if (!isRecord(result) || !Array.isArray(result.items)) {
-    throw new Error('图片列表结果格式无效');
+const parseListItem = (item: unknown): AdminImageListItem => {
+  if (!isListItem(item)) {
+    throw new Error(LIST_RESPONSE_FORMAT_ERROR);
   }
 
-  const normalizedGroup = typeof result.group === 'string'
-    ? normalizeAdminImageBrowseGroup(result.group)
-    : '';
+  return item;
+};
+
+const parseScope = (value: unknown): AdminImageScope => {
+  if (value === '' || isAdminImageScopeKey(value)) return value;
+  throw new Error(LIST_RESPONSE_FORMAT_ERROR);
+};
+
+const parseGroup = (value: unknown): string => {
+  if (value === '' || isAdminImageBrowseGroup(value)) return value;
+  throw new Error(LIST_RESPONSE_FORMAT_ERROR);
+};
+
+const parseSubgroup = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  throw new Error(LIST_RESPONSE_FORMAT_ERROR);
+};
+
+const parseListResult = (result: unknown): AdminImageListResponse => {
+  if (!isRecord(result) || !Array.isArray(result.items)) {
+    throw new Error(LIST_RESPONSE_FORMAT_ERROR);
+  }
+
+  if (
+    !isPositiveInteger(result.page)
+    || !isPositiveInteger(result.totalPages)
+    || !isNonNegativeInteger(result.totalCount)
+  ) {
+    throw new Error(LIST_RESPONSE_FORMAT_ERROR);
+  }
 
   return {
-    scope: isAdminImageScopeKey(result.scope) ? result.scope : DEFAULT_SCOPE,
-    group: isAdminImageBrowseGroup(normalizedGroup) ? normalizedGroup : DEFAULT_GROUP,
-    subgroup: typeof result.subgroup === 'string'
-      ? normalizeAdminImageBrowseSubgroup(result.subgroup)
-      : '',
+    scope: parseScope(result.scope),
+    group: parseGroup(result.group),
+    subgroup: parseSubgroup(result.subgroup),
     groupOptions: parseFilterOptions(result.groupOptions),
     subgroupOptions: parseFilterOptions(result.subgroupOptions),
-    items: result.items.filter(isListItem),
-    page: parsePositiveInteger(result.page, 1),
-    totalPages: parsePositiveInteger(result.totalPages, 1),
-    totalCount: typeof result.totalCount === 'number' && result.totalCount >= 0
-      ? result.totalCount
-      : 0
+    items: result.items.map(parseListItem),
+    page: result.page,
+    totalPages: result.totalPages,
+    totalCount: result.totalCount
   };
 };
 

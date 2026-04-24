@@ -5,6 +5,10 @@ import {
 import {
   resolveAdminImageBrowsePage
 } from '../../lib/admin-console/image-browse';
+import {
+  queryAdminDomControls,
+  reportAdminDomSetupError
+} from '../admin-shared/dom-diagnostics';
 import { type AdminImageClientMeta } from '../admin-shared/image-client';
 import {
   copyText,
@@ -59,57 +63,91 @@ export const initAdminImagesConsole = () => {
     return;
   }
 
-  const bootstrapEl = byId<HTMLDivElement>('admin-images-bootstrap');
-  const formEl = byId<HTMLFormElement>('admin-images-form');
-  const filtersPanelEl = byId<HTMLDivElement>('admin-images-filters');
-  const filterToggleBtn = byId<HTMLButtonElement>('admin-images-filter-toggle');
-  const groupsWrapEl = byId<HTMLDivElement>('admin-images-groups-wrap');
-  const groupsEl = byId<HTMLDivElement>('admin-images-groups');
-  const subgroupsWrapEl = byId<HTMLDivElement>('admin-images-subgroups-wrap');
-  const subgroupsEl = byId<HTMLDivElement>('admin-images-subgroups');
-  const searchPanelEl = byId<HTMLDivElement>('admin-images-search-panel');
-  const searchToggleBtn = byId<HTMLButtonElement>('admin-images-search-toggle');
-  const queryInput = byId<HTMLInputElement>('admin-images-query');
-  const recentBtn = byId<HTMLButtonElement>('admin-images-recent');
-  const refreshBtn = byId<HTMLButtonElement>('admin-images-refresh');
-  const listViewBtn = byId<HTMLButtonElement>('admin-images-view-list');
-  const gridViewBtn = byId<HTMLButtonElement>('admin-images-view-grid');
-  const statusLiveEl = byId<HTMLElement>('admin-images-status-live');
-  const statusEl = byId<HTMLElement>('admin-images-status');
-  const pageMetaEl = byId<HTMLElement>('admin-images-page-meta');
-  const resultListEl = byId<HTMLUListElement>('admin-images-result-list');
-  const emptyEl = byId<HTMLElement>('admin-images-empty');
-  const prevBtn = byId<HTMLButtonElement>('admin-images-prev');
-  const nextBtn = byId<HTMLButtonElement>('admin-images-next');
-  const detailEl = byId<HTMLElement>('admin-images-detail');
+  const controls = {
+    bootstrapEl: byId<HTMLDivElement>('admin-images-bootstrap'),
+    formEl: byId<HTMLFormElement>('admin-images-form'),
+    filtersPanelEl: byId<HTMLDivElement>('admin-images-filters'),
+    filterToggleBtn: byId<HTMLButtonElement>('admin-images-filter-toggle'),
+    groupsWrapEl: byId<HTMLDivElement>('admin-images-groups-wrap'),
+    groupsEl: byId<HTMLDivElement>('admin-images-groups'),
+    subgroupsWrapEl: byId<HTMLDivElement>('admin-images-subgroups-wrap'),
+    subgroupsEl: byId<HTMLDivElement>('admin-images-subgroups'),
+    searchPanelEl: byId<HTMLDivElement>('admin-images-search-panel'),
+    searchToggleBtn: byId<HTMLButtonElement>('admin-images-search-toggle'),
+    queryInput: byId<HTMLInputElement>('admin-images-query'),
+    recentBtn: byId<HTMLButtonElement>('admin-images-recent'),
+    refreshBtn: byId<HTMLButtonElement>('admin-images-refresh'),
+    listViewBtn: byId<HTMLButtonElement>('admin-images-view-list'),
+    gridViewBtn: byId<HTMLButtonElement>('admin-images-view-grid'),
+    statusLiveEl: byId<HTMLElement>('admin-images-status-live'),
+    statusEl: byId<HTMLElement>('admin-images-status'),
+    pageMetaEl: byId<HTMLElement>('admin-images-page-meta'),
+    resultListEl: byId<HTMLUListElement>('admin-images-result-list'),
+    emptyEl: byId<HTMLElement>('admin-images-empty'),
+    prevBtn: byId<HTMLButtonElement>('admin-images-prev'),
+    nextBtn: byId<HTMLButtonElement>('admin-images-next'),
+    detailEl: byId<HTMLElement>('admin-images-detail')
+  };
+  const controlState = queryAdminDomControls(controls, {
+    bootstrapEl: '#admin-images-bootstrap',
+    formEl: '#admin-images-form',
+    filtersPanelEl: '#admin-images-filters',
+    filterToggleBtn: '#admin-images-filter-toggle',
+    groupsWrapEl: '#admin-images-groups-wrap',
+    groupsEl: '#admin-images-groups',
+    subgroupsWrapEl: '#admin-images-subgroups-wrap',
+    subgroupsEl: '#admin-images-subgroups',
+    searchPanelEl: '#admin-images-search-panel',
+    searchToggleBtn: '#admin-images-search-toggle',
+    queryInput: '#admin-images-query',
+    recentBtn: '#admin-images-recent',
+    refreshBtn: '#admin-images-refresh',
+    listViewBtn: '#admin-images-view-list',
+    gridViewBtn: '#admin-images-view-grid',
+    statusLiveEl: '#admin-images-status-live',
+    statusEl: '#admin-images-status',
+    pageMetaEl: '#admin-images-page-meta',
+    resultListEl: '#admin-images-result-list',
+    emptyEl: '#admin-images-empty',
+    prevBtn: '#admin-images-prev',
+    nextBtn: '#admin-images-next',
+    detailEl: '#admin-images-detail'
+  });
 
-  if (
-    !bootstrapEl
-    || !formEl
-    || !filtersPanelEl
-    || !filterToggleBtn
-    || !groupsWrapEl
-    || !groupsEl
-    || !subgroupsWrapEl
-    || !subgroupsEl
-    || !searchPanelEl
-    || !searchToggleBtn
-    || !queryInput
-    || !recentBtn
-    || !refreshBtn
-    || !listViewBtn
-    || !gridViewBtn
-    || !statusLiveEl
-    || !statusEl
-    || !pageMetaEl
-    || !resultListEl
-    || !emptyEl
-    || !prevBtn
-    || !nextBtn
-    || !detailEl
-  ) {
+  if (!controlState.ok) {
+    reportAdminDomSetupError({
+      prefix: '[admin-images]',
+      missing: controlState.missing,
+      statusEl: controlState.controls.statusEl,
+      statusLiveEl: controlState.controls.statusLiveEl
+    });
     return;
   }
+  const {
+    bootstrapEl,
+    formEl,
+    filtersPanelEl,
+    filterToggleBtn,
+    groupsWrapEl,
+    groupsEl,
+    subgroupsWrapEl,
+    subgroupsEl,
+    searchPanelEl,
+    searchToggleBtn,
+    queryInput,
+    recentBtn,
+    refreshBtn,
+    listViewBtn,
+    gridViewBtn,
+    statusLiveEl,
+    statusEl,
+    pageMetaEl,
+    resultListEl,
+    emptyEl,
+    prevBtn,
+    nextBtn,
+    detailEl
+  } = controlState.controls;
 
   const bootstrap = parseBootstrap(bootstrapEl.textContent ?? '');
   if (!bootstrap) {

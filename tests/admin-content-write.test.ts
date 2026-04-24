@@ -89,6 +89,62 @@ describe('admin content write api', () => {
     }
   });
 
+  it('returns structured json errors for invalid write inputs', async () => {
+    const { POST } = await import('../src/pages/api/admin/content/entry');
+
+    const cases = [
+      {
+        body: { collection: 'page', entryId: 'demo', revision: 'stale', frontmatter: {} },
+        status: 400,
+        issuePath: 'collection',
+        message: '不支持的 content collection'
+      },
+      {
+        body: { collection: 'memo', entryId: 'index', revision: 'stale', frontmatter: {} },
+        status: 400,
+        issuePath: 'collection',
+        message: '只读'
+      },
+      {
+        body: { collection: 'essay', entryId: '../secret', revision: 'stale', frontmatter: {} },
+        status: 400,
+        issuePath: 'entryId',
+        message: 'entryId'
+      },
+      {
+        body: { collection: 'essay', entryId: 'missing', revision: 'stale', frontmatter: {} },
+        status: 404,
+        issuePath: 'entryId',
+        message: '未找到 content 源文件'
+      },
+      {
+        body: { collection: 'essay', entryId: 'demo', revision: 'stale', frontmatter: [] },
+        status: 400,
+        issuePath: 'frontmatter',
+        message: 'frontmatter 必须是对象'
+      }
+    ];
+
+    for (const testCase of cases) {
+      const response = await POST({
+        request: createJsonRequest('http://127.0.0.1:4321/api/admin/content/entry?dryRun=1', testCase.body),
+        url: new URL('http://127.0.0.1:4321/api/admin/content/entry?dryRun=1')
+      } as never);
+
+      expect(response.status).toBe(testCase.status);
+      const payload = JSON.parse(await response.text());
+      expect(payload.ok).toBe(false);
+      expect(payload.errors[0]).toContain(testCase.message);
+      expect(payload.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: testCase.issuePath
+          })
+        ])
+      );
+    }
+  });
+
   it('supports dry-run and real writes for essay frontmatter without changing body', async () => {
     const { readAdminContentEntryEditorPayload } = await import('../src/lib/admin-console/content-shared');
     const { POST } = await import('../src/pages/api/admin/content/entry');

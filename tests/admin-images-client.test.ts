@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchList } from '../src/scripts/admin-images/data';
 import {
+  parseAdminImageListResponse,
+  parseAdminImageMetaResponse
+} from '../src/scripts/admin-shared/image-client';
+import {
   DEFAULT_GROUP,
   type AdminImageListItem,
   type AdminImageState
@@ -42,7 +46,7 @@ const createListPayload = () => ({
     subgroup: '',
     groupOptions: [],
     subgroupOptions: [],
-    items: [listItem],
+    items: [listItem] as unknown[],
     page: 1,
     totalPages: 1,
     totalCount: 1
@@ -80,5 +84,95 @@ describe('admin-images/data', () => {
     expect(requestUrl.searchParams.get('group')).toBeNull();
     expect(requestUrl.searchParams.get('q')).toBe('cover');
     expect(requestUrl.searchParams.get('page')).toBe('2');
+  });
+
+  it('accepts the shared field picker list and metadata contracts', () => {
+    const listResult = parseAdminImageListResponse(createListPayload());
+    const metaResult = parseAdminImageMetaResponse({
+      ok: true,
+      result: {
+        kind: 'local',
+        path: listItem.path,
+        value: listItem.value,
+        origin: listItem.origin,
+        width: listItem.width,
+        height: listItem.height,
+        size: listItem.size,
+        mimeType: listItem.mimeType,
+        previewSrc: listItem.previewSrc
+      }
+    });
+
+    expect(listResult.items).toHaveLength(1);
+    expect(listResult.page).toBe(1);
+    expect(metaResult.path).toBe(listItem.path);
+  });
+
+  it('rejects malformed Images Console list items instead of hiding them', async () => {
+    const payload = createListPayload();
+    payload.result.items = [
+      {
+        ...listItem,
+        value: 404
+      }
+    ];
+    mockListFetch(payload);
+
+    await expect(fetchList('/api/admin/images/list', createState({ scope: 'recent' }), 20))
+      .rejects.toThrow('图片列表响应格式无效');
+  });
+
+  it('rejects missing pagination fields from Images Console list responses', async () => {
+    const payload = createListPayload();
+    delete (payload.result as Record<string, unknown>).totalPages;
+    mockListFetch(payload);
+
+    await expect(fetchList('/api/admin/images/list', createState({ scope: 'recent' }), 20))
+      .rejects.toThrow('图片列表响应格式无效');
+  });
+
+  it('rejects malformed Images Console filter options', async () => {
+    const payload = createListPayload();
+    payload.result.groupOptions = [
+      {
+        value: DEFAULT_GROUP,
+        label: '全部',
+        count: '1'
+      }
+    ] as unknown as typeof payload.result.groupOptions;
+    mockListFetch(payload);
+
+    await expect(fetchList('/api/admin/images/list', createState({ scope: 'recent' }), 20))
+      .rejects.toThrow('图片列表响应格式无效');
+  });
+
+  it('rejects malformed shared picker list and metadata responses', () => {
+    expect(() => parseAdminImageListResponse({
+      ...createListPayload(),
+      result: {
+        ...createListPayload().result,
+        items: [
+          {
+            ...listItem,
+            origin: 'remote'
+          }
+        ]
+      }
+    })).toThrow('图片列表响应格式无效');
+
+    expect(() => parseAdminImageMetaResponse({
+      ok: true,
+      result: {
+        kind: 'local',
+        path: listItem.path,
+        value: listItem.value,
+        origin: listItem.origin,
+        width: String(listItem.width),
+        height: listItem.height,
+        size: listItem.size,
+        mimeType: listItem.mimeType,
+        previewSrc: listItem.previewSrc
+      }
+    })).toThrow('图片元数据响应格式无效');
   });
 });

@@ -23,6 +23,27 @@ import {
 export type AdminContentCollectionKey = 'essay' | 'bits' | 'memo';
 export type AdminContentWriteCollectionKey = 'essay' | 'bits';
 
+export const ADMIN_CONTENT_COLLECTION_KEYS = ['essay', 'bits', 'memo'] as const satisfies readonly AdminContentCollectionKey[];
+export const ADMIN_CONTENT_WRITE_COLLECTION_KEYS = ['essay', 'bits'] as const satisfies readonly AdminContentWriteCollectionKey[];
+
+export const isAdminContentCollectionKey = (value: string): value is AdminContentCollectionKey =>
+  (ADMIN_CONTENT_COLLECTION_KEYS as readonly string[]).includes(value);
+
+export const isAdminContentWriteCollectionKey = (value: string): value is AdminContentWriteCollectionKey =>
+  (ADMIN_CONTENT_WRITE_COLLECTION_KEYS as readonly string[]).includes(value);
+
+export type AdminContentEntryResolutionErrorCode = 'invalid-entry-id' | 'source-not-found';
+
+export class AdminContentEntryResolutionError extends Error {
+  readonly code: AdminContentEntryResolutionErrorCode;
+
+  constructor(code: AdminContentEntryResolutionErrorCode, message: string) {
+    super(message);
+    this.name = 'AdminContentEntryResolutionError';
+    this.code = code;
+  }
+}
+
 export type AdminContentValidationIssue = {
   path: string;
   message: string;
@@ -173,12 +194,12 @@ const hashSourceText = (sourceText: string): string =>
 const normalizeEntryId = (entryId: string): string => {
   const normalized = entryId.trim().replace(/\\/g, '/');
   if (!normalized || normalized.startsWith('/') || normalized.includes('//')) {
-    throw new Error(`Unsupported admin content entry id: ${entryId}`);
+    throw new AdminContentEntryResolutionError('invalid-entry-id', `不支持的 content entryId：${entryId}`);
   }
 
   const segments = normalized.split('/');
   if (segments.some((segment) => !segment || segment === '.' || segment === '..')) {
-    throw new Error(`Unsupported admin content entry id: ${entryId}`);
+    throw new AdminContentEntryResolutionError('invalid-entry-id', `不支持的 content entryId：${entryId}`);
   }
 
   return normalized;
@@ -195,7 +216,10 @@ const resolveAdminContentEntrySourcePath = (
     : [`${basePath}.md`, `${basePath}.mdx`, path.join(basePath, 'index.md'), path.join(basePath, 'index.mdx')];
   const resolved = candidates.find((candidate) => existsSync(candidate));
   if (!resolved) {
-    throw new Error(`Admin content source file not found: ${collection}/${normalizedEntryId}`);
+    throw new AdminContentEntryResolutionError(
+      'source-not-found',
+      `未找到 content 源文件：${collection}/${normalizedEntryId}`
+    );
   }
 
   return resolved;
@@ -471,7 +495,7 @@ const toMemoEditorValues = (state: AdminContentSourceState): AdminMemoEditorValu
   };
 };
 
-const readOnlyReasonByCollection = (collection: AdminContentCollectionKey): string | null =>
+export const getAdminContentReadOnlyReason = (collection: AdminContentCollectionKey): string | null =>
   collection === 'memo'
     ? 'Phase 2B 首批仅开放 essay / bits frontmatter 写回；memo 仍保持只读，并单独保留 date 可选 / slug 不走 slugRule 的 schema 差异。'
     : null;
@@ -512,7 +536,7 @@ export const readAdminContentEntryEditorPayload = async (
     revision: state.revision,
     relativePath: state.relativePath,
     writable: false,
-    readonlyReason: readOnlyReasonByCollection(collection) ?? '当前 collection 暂不支持写盘',
+    readonlyReason: getAdminContentReadOnlyReason(collection) ?? '当前 collection 暂不支持写盘',
     values: toMemoEditorValues(state)
   };
 };

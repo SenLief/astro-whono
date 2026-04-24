@@ -1,6 +1,10 @@
 import type { AdminImageOrigin } from '../../lib/admin-console/image-contract';
 import { getAdminImageFieldAllowedOrigins } from '../../lib/admin-console/image-params';
 import {
+  queryAdminDomControls,
+  reportAdminDomSetupError
+} from './dom-diagnostics';
+import {
   fetchAdminImageJson,
   formatAdminImageBytes,
   formatAdminImageMetaSummary,
@@ -61,6 +65,93 @@ export type AdminImagePickerController = {
 export const createAdminImagePicker = (root: ParentNode = document): AdminImagePickerController | null => {
   const dialog = root.querySelector<HTMLDialogElement>('[data-admin-images-picker]');
   if (!(dialog instanceof HTMLDialogElement)) return null;
+  const queryRequired = <TElement extends Element>(
+    selector: string,
+    elementType: { new (): TElement }
+  ): TElement | null => {
+    const element = dialog.querySelector(selector);
+    return element instanceof elementType ? element : null;
+  };
+
+  const controls = {
+    titleEl: queryRequired('[data-admin-images-picker-title]', HTMLElement),
+    descriptionEl: queryRequired('[data-admin-images-picker-description]', HTMLElement),
+    queryInput: queryRequired('[data-admin-images-picker-query]', HTMLInputElement),
+    filtersEl: queryRequired('[data-admin-images-picker-filters]', HTMLElement),
+    filterTabsEl: queryRequired('[data-admin-images-picker-filter-tabs]', HTMLElement),
+    filterToggleBtn: queryRequired('[data-admin-images-picker-filter-toggle]', HTMLButtonElement),
+    statusEl: queryRequired('[data-admin-images-picker-status]', HTMLElement),
+    resultsEl: queryRequired('[data-admin-images-picker-results]', HTMLElement),
+    pageEl: queryRequired('[data-admin-images-picker-page]', HTMLElement),
+    prevBtn: queryRequired('[data-admin-images-picker-prev]', HTMLButtonElement),
+    nextBtn: queryRequired('[data-admin-images-picker-next]', HTMLButtonElement),
+    closeBtn: queryRequired('[data-admin-images-picker-close]', HTMLButtonElement),
+    resetBtn: queryRequired('[data-admin-images-picker-reset]', HTMLButtonElement),
+    confirmBtn: queryRequired('[data-admin-images-picker-confirm]', HTMLButtonElement),
+    listViewBtn: queryRequired('[data-admin-images-picker-view="list"]', HTMLButtonElement),
+    gridViewBtn: queryRequired('[data-admin-images-picker-view="grid"]', HTMLButtonElement)
+  };
+  const controlState = queryAdminDomControls(controls, {
+    titleEl: '[data-admin-images-picker-title]',
+    descriptionEl: '[data-admin-images-picker-description]',
+    queryInput: '[data-admin-images-picker-query]',
+    filtersEl: '[data-admin-images-picker-filters]',
+    filterTabsEl: '[data-admin-images-picker-filter-tabs]',
+    filterToggleBtn: '[data-admin-images-picker-filter-toggle]',
+    statusEl: '[data-admin-images-picker-status]',
+    resultsEl: '[data-admin-images-picker-results]',
+    pageEl: '[data-admin-images-picker-page]',
+    prevBtn: '[data-admin-images-picker-prev]',
+    nextBtn: '[data-admin-images-picker-next]',
+    closeBtn: '[data-admin-images-picker-close]',
+    resetBtn: '[data-admin-images-picker-reset]',
+    confirmBtn: '[data-admin-images-picker-confirm]',
+    listViewBtn: '[data-admin-images-picker-view="list"]',
+    gridViewBtn: '[data-admin-images-picker-view="grid"]'
+  });
+
+  if (!controlState.ok) {
+    reportAdminDomSetupError({
+      prefix: '[admin-images-picker]',
+      missing: controlState.missing,
+      statusEl: controlState.controls.statusEl
+    });
+    return null;
+  }
+  const {
+    titleEl,
+    descriptionEl,
+    queryInput,
+    filtersEl,
+    filterTabsEl,
+    filterToggleBtn,
+    statusEl,
+    resultsEl,
+    pageEl,
+    prevBtn,
+    nextBtn,
+    closeBtn,
+    resetBtn,
+    confirmBtn,
+    listViewBtn,
+    gridViewBtn
+  } = controlState.controls;
+
+  const listEndpoint = dialog.dataset.listEndpoint?.trim() ?? '';
+  const metaEndpoint = dialog.dataset.metaEndpoint?.trim() ?? '';
+  const missingEndpoints = [
+    ...(!listEndpoint ? ['data-list-endpoint'] : []),
+    ...(!metaEndpoint ? ['data-meta-endpoint'] : [])
+  ];
+  if (missingEndpoints.length > 0) {
+    reportAdminDomSetupError({
+      prefix: '[admin-images-picker]',
+      message: '图片选择器缺少必要 endpoint 配置，客户端脚本已停止初始化。',
+      missing: missingEndpoints,
+      statusEl
+    });
+    return null;
+  }
 
   const getOriginOptions = (field: AdminImagePickerField): AdminImagePickerOriginOption[] => {
     const allowedOrigins = getAdminImageFieldAllowedOrigins(field).filter((origin) => origin !== 'src/content');
@@ -70,47 +161,6 @@ export const createAdminImagePicker = (root: ParentNode = document): AdminImageP
       ...allowedOrigins.map((origin) => ({ value: origin, label: getAdminImageOriginLabel(origin) }))
     ];
   };
-
-  const listEndpoint = dialog.dataset.listEndpoint?.trim() ?? '';
-  const metaEndpoint = dialog.dataset.metaEndpoint?.trim() ?? '';
-  if (!listEndpoint || !metaEndpoint) return null;
-
-  const titleEl = dialog.querySelector<HTMLElement>('[data-admin-images-picker-title]');
-  const descriptionEl = dialog.querySelector<HTMLElement>('[data-admin-images-picker-description]');
-  const queryInput = dialog.querySelector<HTMLInputElement>('[data-admin-images-picker-query]');
-  const filtersEl = dialog.querySelector<HTMLElement>('[data-admin-images-picker-filters]');
-  const filterTabsEl = dialog.querySelector<HTMLElement>('[data-admin-images-picker-filter-tabs]');
-  const filterToggleBtn = dialog.querySelector<HTMLButtonElement>('[data-admin-images-picker-filter-toggle]');
-  const statusEl = dialog.querySelector<HTMLElement>('[data-admin-images-picker-status]');
-  const resultsEl = dialog.querySelector<HTMLElement>('[data-admin-images-picker-results]');
-  const pageEl = dialog.querySelector<HTMLElement>('[data-admin-images-picker-page]');
-  const prevBtn = dialog.querySelector<HTMLButtonElement>('[data-admin-images-picker-prev]');
-  const nextBtn = dialog.querySelector<HTMLButtonElement>('[data-admin-images-picker-next]');
-  const closeBtn = dialog.querySelector<HTMLButtonElement>('[data-admin-images-picker-close]');
-  const resetBtn = dialog.querySelector<HTMLButtonElement>('[data-admin-images-picker-reset]');
-  const confirmBtn = dialog.querySelector<HTMLButtonElement>('[data-admin-images-picker-confirm]');
-  const listViewBtn = dialog.querySelector<HTMLButtonElement>('[data-admin-images-picker-view="list"]');
-  const gridViewBtn = dialog.querySelector<HTMLButtonElement>('[data-admin-images-picker-view="grid"]');
-  if (
-    !(titleEl instanceof HTMLElement)
-    || !(descriptionEl instanceof HTMLElement)
-    || !(queryInput instanceof HTMLInputElement)
-    || !(filtersEl instanceof HTMLElement)
-    || !(filterTabsEl instanceof HTMLElement)
-    || !(filterToggleBtn instanceof HTMLButtonElement)
-    || !(statusEl instanceof HTMLElement)
-    || !(resultsEl instanceof HTMLElement)
-    || !(pageEl instanceof HTMLElement)
-    || !(prevBtn instanceof HTMLButtonElement)
-    || !(nextBtn instanceof HTMLButtonElement)
-    || !(closeBtn instanceof HTMLButtonElement)
-    || !(resetBtn instanceof HTMLButtonElement)
-    || !(confirmBtn instanceof HTMLButtonElement)
-    || !(listViewBtn instanceof HTMLButtonElement)
-    || !(gridViewBtn instanceof HTMLButtonElement)
-  ) {
-    return null;
-  }
 
   let currentOptions: AdminImagePickerOpenOptions | null = null;
   let currentViewMode: AdminImagePickerViewMode = 'list';
@@ -423,7 +473,7 @@ export const createAdminImagePicker = (root: ParentNode = document): AdminImageP
       totalPages = 1;
       syncPager();
       resultsEl.replaceChildren();
-      setStatus('加载失败');
+      setStatus(error instanceof Error ? error.message : '加载失败');
     }
   };
 

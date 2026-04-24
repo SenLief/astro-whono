@@ -39,10 +39,8 @@ if (!root) {
   const controlState = queryAdminDataControls();
   if (!controlState.ok) {
     reportAdminDataSetupError(controlState.controls, {
-      title: 'Data Console 初始化失败',
-      statusText: '初始化失败',
       message: '页面缺少必要控件，客户端脚本已停止初始化。请刷新页面，或检查模板与控件 id 是否仍保持一致。',
-      details: controlState.missing.map((id) => `缺少节点：#${id}`)
+      details: controlState.missing
     });
   } else {
     const controls = controlState.controls;
