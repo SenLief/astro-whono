@@ -27,7 +27,7 @@ A minimal two-column Astro theme for personal writing and lightweight publishing
 - Two-column layout (sidebar navigation + content area)
 - Responsive design for mobile devices
 - Content collections: essay / bits / memo (archive is generated from essay)
-- Built-in local Theme Console (`/admin`) for visually managing site settings during development, making it easy to take over the theme after forking or cloning
+- Built-in local Admin Console (`/admin`): use Theme / Images / Checks / Data Console in development to manage site settings and assets, and take over the theme after forking or cloning
 - Bits draft generator on `/bits/`: one-click Markdown output (copy/download), with multi-image support and automatic image dimension detection
 - RSS: default archive feed + section feeds
 - Light / dark theme + reading mode
@@ -76,7 +76,7 @@ Use them depending on the situation:
 # Default regression entry (GitHub Actions)
 npm run ci
 
-# Manual release verification for absolute links / sitemap / RSS
+# Manual release verification for absolute links / sitemap / RSS (requires the final production domain)
 SITE_URL=https://your-domain npm run build
 SITE_URL=https://your-domain npm run check:prod-artifacts
 
@@ -144,39 +144,13 @@ npm run check:preview-admin
 - Page / scene style entries: `src/styles/home.css`, `src/styles/about.css`, `src/styles/memo.css`, `src/styles/article.css`, `src/styles/bits-page.css`
 - Admin style entry: `src/styles/components/admin-shell.css` + route-specific Admin styles; the full `admin.css` aggregate is no longer provided
 
-### Theme Console (`/admin`)
+### Admin Console (`/admin`)
 
-astro-whono includes a local Theme Console for visually configuring the theme during development. After forking or cloning the project, you can take over site-level settings without first learning the entire codebase structure.
+astro-whono includes a local Admin Console as the development entry point for viewing the site overview, adjusting theme settings, and importing/exporting settings snapshots.
 
-<details>
-<summary><strong>🖼️ Theme Console Preview</strong></summary>
+#### Admin Entry Points
 
-<br>
-
-Site settings and sidebar configuration:
-
-![Theme Console - Site and Sidebar](.github/assets/theme-console-overview-1.png)
-
-Home page, inner pages, and reading/code settings:
-
-![Theme Console - Home, Pages and UI](.github/assets/theme-console-overview-2.png)
-
-</details>
-
-#### What you can configure
-Theme Console currently focuses on **site-level** and **page-level** settings, including:
-
-- Site title, description, brand name, and other basic metadata
-- Home intro copy and Hero image settings
-- Sidebar navigation labels, visibility, and ordering
-- Social links and custom social items
-- Footer copyright line / basic footer copy
-- Main title and subtitle for fixed inner pages
-- Default author for the `/bits/` page
-
-#### How to use it
-
-Theme Console is intended for **local development** by default.
+Admin Console is intended for **local development** by default.
 
 Start the dev server:
 
@@ -188,16 +162,53 @@ npm run dev
 Then open `http://localhost:4321/admin/` in your browser.
 (If you changed the dev server port, replace `4321` with your actual port.)
 
+| Entry | Status | Purpose |
+| :---: | :---: | :--- |
+| `/admin/` | Available | Stable Admin entry and Site Overview |
+| `/admin/theme/` | Available | Theme Console for editing site information, sidebar, home page, inner-page copy, and more |
+| `/admin/images/` | Available | Image resource browser and path helper |
+| `/admin/checks/` | Available | Structured diagnostics and pre-release checks |
+| `/admin/data/` | Available | Settings snapshot export / dry-run import / confirmed write |
+| `/admin/content/` | In progress | Placeholder for content management and visual writing |
+
+
+<details>
+<summary><strong>🖼️ Theme Console Overview </strong></summary>
+
+astro-whono provides a local Theme Console for centralized theme-level configuration in development.<br>
+
+#### Current Theme Console Support
+
+Theme Console mainly covers **site-level** and **page-level** settings, including:
+
+- Site title, description, brand name, and other basic metadata
+- `/admin/` Overview public visibility and hidden-state copy
+- Home intro copy and Hero image settings
+- Sidebar navigation labels, visibility, and ordering
+- Social links and custom social items
+- Footer copyright line / basic footer copy
+- Main title and subtitle for fixed inner pages
+- Article metadata display rules
+- Default author for the `/bits/` page
+
+For more details, see the [Theme Console configuration guide](https://astro.whono.me/archive/theme-console-guide/).
+
+<br>
+</details>
+
 #### Production behavior
 
-- Theme Console is available only in local development, with config loading, validation, and saving enabled
-- Production builds remain static output; `/admin/` shows a read-only notice only
+- Theme Console / Data Console provide write capabilities only in local development; Content Console is still a placeholder.
+- `/admin/content/` and `/admin/content/:collection/` currently only show the work-in-progress notice; collection overview, details, and frontmatter editing are not exposed.
+- Production builds remain static output. `/admin/` can show a read-only public Overview or a hidden-state message based on Theme settings; production does not show Admin tabs, and other Admin subroutes only keep a local-development notice.
 - `/api/admin/settings/` is for local development only and should not be treated as a production API
+- `/api/admin/content/entry/` is for local development frontmatter writes only and should not be treated as a production API
+- `/api/admin/data/settings/` is for local development settings export only and should not be treated as a production API
 
 #### Compatibility for existing forks
 
 - If `src/data/settings/*.json` does not exist yet, the frontend still reads config via `settings > legacy > default`
-- The JSON files are generated only after the first save in `/admin`, so no manual migration script is required
+- The JSON files are generated only after the first save in `/admin/theme/`, so no manual migration script is required
 
 
 ## Content and Writing

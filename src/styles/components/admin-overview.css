@@ -10,7 +10,7 @@
   --admin-site-overview-recent-hover-bg: color-mix(in srgb, var(--code-content-bg) 90%, var(--border) 10%);
 
   display: grid;
-  gap: 28px;
+  gap: 22px;
   min-width: 0;
   letter-spacing: 0;
 }
@@ -27,7 +27,7 @@
 
 .admin-site-overview__stat {
   min-width: 0;
-  padding: 18px 20px 20px;
+  padding: 12px 20px 14px;
   border-left: 1px solid var(--border);
 }
 
@@ -57,7 +57,8 @@
 .admin-site-overview__label {
   margin: 0 0 8px;
   color: var(--faint);
-  font-size: var(--admin-text-xs);
+  font-family: var(--admin-font-copy);
+  font-size: var(--admin-text-sm);
   line-height: 1.4;
 }
 
@@ -427,7 +428,7 @@
 
 .admin-site-overview__tag {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
   min-width: 0;
   max-width: min(100%, 14rem);
@@ -447,9 +448,7 @@
 .admin-site-overview__tag-name {
   min-width: 0;
   font-family: var(--admin-font-copy);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .admin-site-overview__tag-hash {

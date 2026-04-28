@@ -28,7 +28,7 @@
 - 双栏布局（侧栏导航 + 内容区）
 - 移动端适配
 - 内容集合：随笔 / 絮语 / 小记（归档为目录视图）
-- 内置本地 Admin Console（/admin）：开发环境下可使用 Theme / Data Console 管理站点配置，fork / clone 后可快速完成站点接管
+- 内置本地 Admin Console（/admin）：开发环境下可使用 Theme / Images / Checks / Data Console 管理站点配置与资源，fork / clone 后可快速完成站点接管
 - 絮语草稿生成器：/bits 页面一键生成 Markdown（复制/下载），支持多图与自动读取尺寸
 - RSS：默认归档订阅 + 分栏订阅
 - 浅色 / 深色模式 + 阅读模式
@@ -86,9 +86,9 @@ npm run check:preview-admin
 ```
 
 - `npm test` 主要覆盖标签工具、Theme Console 共享校验规则，以及主题设置 `revision` 的关键纯逻辑回归。
-  - npm run ci 是默认回归入口；npm run ci:core 仅用于更快的本地增量回归。
-  - 未设置 SITE_URL 时，npm run build 仍可构建，但 SEO 相关输出会不完整。
-  - 发布前如需核对绝对链接产物，设置真实 SITE_URL 后运行 npm run check:prod-artifacts。
+- npm run ci 是默认回归入口；npm run ci:core 仅用于更快的本地增量回归。
+- 未设置 SITE_URL 时，npm run build 仍可构建，但 SEO 相关输出会不完整。
+- 发布前如需核对绝对链接产物，设置真实 SITE_URL 后运行 npm run check:prod-artifacts。
 </details>
 
 
@@ -147,39 +147,11 @@ npm run check:preview-admin
 
 ### Admin Console（/admin）
 
-astro-whono 内置本地 Admin Console，用于开发环境中可视化接管站点配置。在 fork 或 clone 项目后，无需先熟悉整个项目结构，也能快速完成主题调整与 settings 数据导入导出。
+astro-whono 内置本地 Admin Console，作为开发环境中的后台入口，用于查看站点概况、调整主题配置、导入导出 settings 快照等。
 
-<details>
-<summary><strong>🖼️ Theme Console 预览</strong></summary>
+#### 后台入口
 
-<br>
-
-站点设置与侧栏配置：
-
-![Theme Console - Site and Sidebar](.github/assets/theme-console-overview-1.png)
-
-首页、内页与阅读/代码设置：
-
-![Theme Console - Home, Pages and UI](.github/assets/theme-console-overview-2.png)
-
-</details>
-
-#### 当前可配置内容
-Theme Console 主要面向**站点级**和**页面级**配置，目前支持：
-
-- 站点标题、描述、品牌名等基础信息
-- `/admin/` Overview 对外展示开关与关闭态文案
-- 首页导语与 Hero图片设置
-- 侧边栏导航的显示、顺序与文案
-- 社交链接与自定义社交项
-- 底部版权行 / Footer 基础文案
-- 固定内页的主副标题
-- 文章元信息展示规则
-- /bits/ 页面默认作者
-
-#### 如何启用
-
-Admin Console 默认用于**本地开发环境**。
+Admin Console 默认面向**本地开发环境**。
 
 启动开发环境：
 
@@ -187,29 +159,56 @@ Admin Console 默认用于**本地开发环境**。
 npm install
 npm run dev
 ```
-在浏览器中打开 `http://localhost:4321/admin/`
-(如果你修改了开发端口，请将 `4321` 替换为实际端口。)
 
-- `/admin/`：后台稳定入口与概览页
-- `/admin/theme/`：Theme Console 实际编辑页
-- `/admin/content/`：文章管理与可视化写作占位页（开发中）
-- `/admin/content/:collection/`：同上，当前暂不开放内容详情与 frontmatter 编辑
-- `/admin/data/`：settings 快照导出 / dry-run 导入 / 确认写入
+在浏览器中打开 `http://localhost:4321/admin/`
+（如果你修改了开发端口，请将 `4321` 替换为实际端口。）
+
+| 入口 | 状态 | 用途 |
+| :---: | :---: | :--- |
+| `/admin/` | 可用 | 后台稳定入口与 Site Overview |
+| `/admin/theme/` | 可用 | Theme Console，编辑站点信息、侧栏、首页与内页文案等 |
+| `/admin/images/` | 可用 | 图片资源浏览与路径辅助 |
+| `/admin/checks/` | 可用 | 结构化诊断与发布前自检 |
+| `/admin/data/` | 可用 | settings 快照导出 / dry-run 导入 / 确认写入 |
+| `/admin/content/` | 开发中 | 文章管理与可视化写作占位页 |
+
+
+<details>
+<summary><strong>🖼️ Theme Console 简介 </strong></summary>
+
+astro-whono 提供一个本地 Theme Console，用于在开发环境中集中管理主题级配置。<br>
+
+#### Theme Console 当前支持
+
+Theme Console 主要面向**站点级**和**页面级**配置，支持内容：
+
+- 站点标题、描述、品牌名等基础信息
+- `/admin/` Overview 对外展示开关与关闭态文案
+- 首页导语与 Hero 图片设置
+- 侧边栏导航的显示、顺序与文案
+- 社交链接与自定义社交项
+- 底部版权行 / Footer 基础文案
+- 固定内页的主副标题
+- 文章元信息展示规则
+- `/bits/` 页面默认作者
+更多内容请查看 [Theme Console 配置指南](https://astro.whono.me/archive/theme-console-guide/)
+
+<br>
+</details>
 
 #### 生产环境说明
 
-- Theme Console / Data Console 仅在本地开发环境可用；Content Console 当前开发态也保持占位，等待前端技术栈重构
+- Theme Console / Data Console 仅在本地开发环境提供写入能力；Content Console 当前仍为占位页
 - `/admin/content/` 与 `/admin/content/:collection/` 当前仅显示开发中提示，不开放 collection 概览、详情与 frontmatter 写入界面
 - 生产构建保持静态站点输出；`/admin/` 可按 Theme 设置显示只读公开 Overview 或关闭态文案，生产态不展示后台 tabs，其他后台子路由仅保留本地开发提示
 - `/api/admin/settings/` 仅供本地开发使用，生产环境不要依赖该接口
 - `/api/admin/content/entry/` 仅供本地开发写入内容 frontmatter，生产环境不要依赖该接口
 - `/api/admin/data/settings/` 仅供本地开发导出 settings 快照，生产环境不要依赖该接口
 
-
-#### 兼容迁移（已 fork用户）：
+#### 兼容迁移（已 fork 用户）
 
 - 未创建 `src/data/settings/*.json` 时，前台仍会按 `settings > legacy > default` 正常读取
-- 首次在 `/admin` 点击保存后，才会生成对应的 JSON 文件，无需手动执行迁移脚本
+- 首次在 `/admin/theme/` 点击保存后，才会生成对应的 JSON 文件，无需手动执行迁移脚本
 
 
 ## 内容与写作

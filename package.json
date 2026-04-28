@@ -1,6 +1,6 @@
 {
   "name": "astro-whono",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -55,8 +55,10 @@
     "anymatch": {
       "picomatch": "2.3.2"
     },
+    "fast-xml-parser": "5.7.0",
     "h3": "1.15.9",
     "picomatch": "4.0.4",
+    "postcss": "8.5.12",
     "rollup": "4.59.0",
     "volar-service-yaml": "0.0.70",
     "yaml": "2.8.3",

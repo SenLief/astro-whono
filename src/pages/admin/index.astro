@@ -45,6 +45,7 @@ const lastUpdateDays = overview?.stats.lastUpdate
   : '暂无';
 const wordMetric = overview ? formatAdminOverviewWordMetric(overview.stats.wordCount) : null;
 const articleCount = overview?.collections.find((summary) => summary.key === 'essay')?.count ?? 0;
+const moreTagsHref = withBase('/archive/?picker=tag');
 const statItems = overview && wordMetric
   ? [
       {
@@ -148,6 +149,18 @@ const statItems = overview && wordMetric
                         <span class="admin-site-overview__tag-count">{tag.count}</span>
                       </a>
                     ))
+                  }
+                  {
+                    overview.stats.tagCount > overview.topTags.length ? (
+                      <a
+                        class="admin-site-overview__tag"
+                        href={moreTagsHref}
+                        title="查看所有标签"
+                        aria-label={`查看全部 ${overview.stats.tagCount} 个标签`}
+                      >
+                        <span class="admin-site-overview__tag-name">更多</span>
+                      </a>
+                    ) : null
                   }
                 </div>
               ) : (

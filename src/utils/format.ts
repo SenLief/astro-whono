@@ -74,7 +74,7 @@ export function normalizeHeroImageSrc(value: unknown): string | null | undefined
   if (!trimmed) return null;
 
   const safeRemoteUrl = toSafeHttpUrl(trimmed);
-  if (safeRemoteUrl) return safeRemoteUrl;
+  if (safeRemoteUrl.startsWith('https://')) return safeRemoteUrl;
 
   const normalized = trimmed.replace(/\\/g, '/').replace(/^\.\/+/, '');
   if (!normalized || normalized.startsWith('//') || hasInvalidLocalImagePathSegment(normalized)) {

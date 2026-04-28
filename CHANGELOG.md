@@ -7,32 +7,49 @@ The format is based on Keep a Changelog, and this project aims to follow Semanti
 
 ## [Unreleased]
 
-本次更新把 `/admin/` 扩展为本地站点维护后台。开发环境中可查看站点概览、编辑内容 frontmatter、管理主题配置、浏览图片资源、导入导出 settings，并运行发布前检查。生产构建继续保持只读边界，后台接口不作为公开 API 暴露。
+## [0.4.0] - 2026-04-28
+
+本次更新把 `/admin/` 扩展为本地站点维护后台。开发环境中可查看站点概览、管理主题配置、浏览图片资源、导入导出 settings，并运行发布前检查。生产构建继续保持只读，后台接口不作为公开 API 暴露。
 
 
 ### Added
 - 新增 `/admin/` Site Overview，集中查看内容统计、归档标签、年份分布、写作活动和最近内容。
-- 新增 `/admin/content/` Content Console，可浏览 `essay / bits / memo`，并编辑 `essay / bits` 的 frontmatter；`memo` 保持只读。
 - 新增 `/admin/images/` Images Console，可浏览、搜索、分页查看本地图片资源，并复制路径或用于字段回填。
-- 新增 Theme / Content 共用图片选择器，可为 Hero 图片、Bits 默认头像和 `bits.images` 选择受控图片。
+- 新增 Theme 图片选择器，可为 Hero 图片、Bits 默认头像选择受控图片。
 - 新增 `/admin/data/` Data Console，支持 settings 快照导出、导入校验、差异预览和确认写入。
 - 新增 `/admin/checks/` Checks Console，集中检查 settings、slug、图片路径和 tag 路由键。
 - 新增共享后台壳层与导航，让各个 Admin 页面保持一致的入口、状态提示和只读边界。
 
 ### Changed
 - `/admin/` 从 Theme Console 调整为后台总入口；Theme Console 移至 `/admin/theme/`，已有 settings 数据无需迁移。
-- 后台切换真实路由时会检查未保存更改，减少误离开导致的草稿丢失。
-- `/admin/**` 与 `/api/admin/**` 的开发、preview、production 边界统一：开发态可操作，生产相关构建保持只读或非公开 API 壳。
-- Content Console 的 `bits.images` 改为图片行编辑器，不再要求手写 JSON。
+- Theme Console 有未保存更改时，切换后台真实路由会先确认，减少误离开导致的草稿丢失。
+- `/admin/**` 与 `/api/admin/**` 的开发、preview、production 边界统一：开发态提供可操作页面或明确占位，生产相关构建保持只读或非公开 API 壳。
 - Images Console 的浏览、搜索和分页改为优先使用本地索引，减少重复请求和等待。
 - 引入 `@lucide/astro` 作为非品牌 UI 图标来源；品牌与联系方式图标继续使用站点内置图标，旧图标调用保持兼容。
 - 升级 Astro 至 `6.1.7`，并同步调整依赖锁定与 overrides，适配 Astro 6 下静态 API 路由在 preview / production 中的输出行为。
 
+### Upgrade note for fork users
+
+如果你从 `0.2.0` 之后开始使用 Theme Console，并已经修改过 `src/data/settings/*.json`，建议在升级到本版本前先导出一份 settings 备份，用于保留升级前的配置快照。
+
+在 fork 项目根目录运行：
+
+```bash
+curl -fL https://raw.githubusercontent.com/cxro/astro-whono/v0.4.0/scripts/export-astro-whono-settings.mjs -o export-astro-whono-settings.mjs
+node export-astro-whono-settings.mjs
+```
+
+请保存生成的 `astro-whono-settings-backup-*.json`。升级到本版本后，优先在本地开发环境通过 `/admin/data/` 导入该文件并执行 dry-run；备份包中的 `compatibility.dataConsoleDryRunCandidate = eligible` 只表示可以作为 dry-run 候选，不代表一定能直接写入。
+
+如果 dry-run 未通过，或备份包标记为 `needs-migration` / `legacy-only`，请把包内的 `rawFiles` / `legacyRawFiles` 作为人工迁移依据。该脚本只备份 Theme Console 的 settings 数据，不包含 `src/content/**`、`public/**` 或 `src/assets/**`。
+
 ### Fixed
 - 修正文档中的 Data Console manifest 协议说明，明确当前固定字段。
-- 修复 Theme Console、Content Console 与 Images Console 调用图片接口时尾斜杠不一致导致的 404。
+- 修复 Theme Console 与 Images Console 调用图片接口时尾斜杠不一致导致的 404。
 - 修复 `/admin/images/` 首屏和目录切换重复请求图片列表的问题，降低本地浏览卡顿。
 - 修复图片浏览默认系统资源过滤过宽的问题，避免误隐藏 `src/content/**/preview-*.png` 等真实附件。
+- 修复 Lightbox 翻页按钮无法被屏幕阅读器发现的问题。
+- 统一 `package-lock.json` 的 tarball 来源为官方 npm registry，避免 CI 安装链路隐式依赖第三方镜像。
 
 ## [0.3.1] - 2026-03-24
 
