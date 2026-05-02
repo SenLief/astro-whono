@@ -3,7 +3,10 @@ import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { normalizeBitsAvatarPath } from '../../utils/format';
-import { DATE_ONLY_RE, parseDateOnlyUtc } from '../../utils/date-only';
+import {
+  parseEssayDateInput,
+  parseEssayPublishedAtInput
+} from '../../utils/date-only';
 import { normalizeAdminBitsImageSource } from './image-shared';
 import {
   ESSAY_PUBLIC_SLUG_RE,
@@ -50,6 +53,7 @@ export type AdminEssayEditorValues = {
   title: string;
   description: string;
   date: string;
+  publishedAt: string;
   tagsText: string;
   draft: boolean;
   archive: boolean;
@@ -121,6 +125,7 @@ type AdminEssayFrontmatter = {
   title: string;
   description?: string;
   date: string;
+  publishedAt?: string;
   tags: string[];
   draft: boolean;
   archive: boolean;
@@ -276,6 +281,7 @@ const parseAdminEssayEditorInput = (
     title: getRequiredStringField(input, 'title', issues),
     description: getRequiredStringField(input, 'description', issues),
     date: getRequiredStringField(input, 'date', issues),
+    publishedAt: typeof input.publishedAt === 'string' ? input.publishedAt : '',
     tagsText: getRequiredStringField(input, 'tagsText', issues),
     draft: getRequiredBooleanField(input, 'draft', issues),
     archive: getRequiredBooleanField(input, 'archive', issues),
@@ -448,10 +454,15 @@ const loadAdminContentSourceState = async (
 
 const toEssayEditorValues = (state: AdminContentSourceState): AdminEssayEditorValues => {
   const frontmatter = state.rawFrontmatter;
+  const rawDate = getDateString(frontmatter, 'date', '');
+  const rawPublishedAt = normalizeOptionalText(frontmatter.publishedAt);
+  const dateResult = parseEssayDateInput(rawDate);
+
   return {
     title: normalizeOptionalText(frontmatter.title),
     description: normalizeOptionalText(frontmatter.description),
-    date: getDateString(frontmatter, 'date', ''),
+    date: dateResult?.dateText ?? rawDate,
+    publishedAt: rawPublishedAt || dateResult?.publishedAtText || '',
     tagsText: getStringArray(frontmatter.tags).join('\n'),
     draft: frontmatter.draft === true,
     archive: frontmatter.archive !== false,
@@ -543,18 +554,28 @@ const buildEssayFrontmatterFromValues = (
     issues.push(createIssue('title', 'title 不能为空'));
   }
 
-  const date = values.date.trim();
-  if (!DATE_ONLY_RE.test(date)) {
-    issues.push(createIssue('date', 'essay.date 必须是 YYYY-MM-DD'));
-  } else if (!parseDateOnlyUtc(date)) {
-    issues.push(createIssue('date', 'essay.date 不是合法日期'));
+  const dateResult = parseEssayDateInput(values.date);
+  if (!dateResult) {
+    issues.push(createIssue('date', 'essay.date 必须是 YYYY-MM-DD 或带时区的 ISO 8601 日期时间'));
   }
 
-  if (issues.length > 0) {
+  const explicitPublishedAt = values.publishedAt.trim();
+  const hasExplicitPublishedAt = explicitPublishedAt.length > 0;
+  const publishedAt = hasExplicitPublishedAt
+    ? parseEssayPublishedAtInput(explicitPublishedAt)
+    : dateResult?.publishedAt;
+
+  if (hasExplicitPublishedAt && !publishedAt) {
+    issues.push(createIssue('publishedAt', 'essay.publishedAt 必须是带时区的 ISO 8601 日期时间'));
+  }
+
+  if (!dateResult || issues.length > 0) {
     return { issues };
   }
 
   const slug = values.slug.trim();
+  const date = dateResult.dateText;
+  const publishedAtText = hasExplicitPublishedAt ? explicitPublishedAt : dateResult.publishedAtText;
 
   return {
     issues,
@@ -562,6 +583,7 @@ const buildEssayFrontmatterFromValues = (
       title,
       ...(values.description.trim() ? { description: values.description.trim() } : {}),
       date,
+      ...(publishedAtText ? { publishedAt: publishedAtText } : {}),
       tags: parseTagsText(values.tagsText),
       draft: values.draft === true,
       archive: values.archive !== false,
@@ -729,6 +751,8 @@ const buildEssayWritePlan = async (
   }
 
   const current = buildEssayCurrentFrontmatter(state);
+  const currentDate = getDateString(state.rawFrontmatter, 'date', current.date);
+  const currentPublishedAt = normalizeOptionalText(state.rawFrontmatter.publishedAt) || undefined;
   const fieldMatrix: Array<{
     field: string;
     path: readonly string[];
@@ -737,7 +761,8 @@ const buildEssayWritePlan = async (
   }> = [
     { field: 'title', path: ['title'], currentValue: current.title, nextValue: next.frontmatter.title },
     { field: 'description', path: ['description'], currentValue: current.description, nextValue: next.frontmatter.description },
-    { field: 'date', path: ['date'], currentValue: current.date, nextValue: next.frontmatter.date },
+    { field: 'date', path: ['date'], currentValue: currentDate, nextValue: next.frontmatter.date },
+    { field: 'publishedAt', path: ['publishedAt'], currentValue: currentPublishedAt, nextValue: next.frontmatter.publishedAt },
     { field: 'tags', path: ['tags'], currentValue: current.tags, nextValue: next.frontmatter.tags },
     { field: 'draft', path: ['draft'], currentValue: current.draft, nextValue: next.frontmatter.draft },
     { field: 'archive', path: ['archive'], currentValue: current.archive, nextValue: next.frontmatter.archive },

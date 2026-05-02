@@ -246,6 +246,20 @@ slug: optional      # Custom URL slug (defaults to the flattened content path, e
 badge: optional     # List badge; if omitted, list shows "Essay"
 ```
 
+`essay.date` should use the `YYYY-MM-DD` format for archive grouping, ordering, and page date display.
+
+Legacy ISO 8601 datetime values are still accepted. When written as a string, for example `date: "2026-01-01T12:00:00+08:00"`, the leading date is normalized to `2026-01-01`.
+
+If you need to keep a precise publish time, you can add:
+
+```yaml
+publishedAt: 2026-01-01T12:00:00+08:00
+```
+
+`publishedAt` does not need to be added to existing content in bulk. Public lists, archives, RSS, and page date display still use `date`.
+
+Unquoted YAML datetimes are also accepted. In rare UTC-boundary cases, the parser may have already lost the original timezone text; in that case the parsed UTC date is used.
+
 Bits:
 ```yaml
 date: 2026-01-01T12:00:00+08:00 # Example; generator outputs local timezone
