@@ -73,9 +73,8 @@ const setPreview = (
 ): void => {
   if (!(previewWrap instanceof HTMLElement)) return;
 
-  previewWrap.setAttribute('data-admin-images-preview-state', state.kind);
-
-  if (state.kind === 'hidden') {
+  const hidePreview = (): void => {
+    previewWrap.setAttribute('data-admin-images-preview-state', 'hidden');
     previewWrap.hidden = true;
     previewImg?.removeAttribute('src');
     if (previewImg instanceof HTMLImageElement) previewImg.hidden = true;
@@ -83,6 +82,12 @@ const setPreview = (
       previewPlaceholder.textContent = '';
       previewPlaceholder.hidden = true;
     }
+  };
+
+  previewWrap.setAttribute('data-admin-images-preview-state', state.kind);
+
+  if (state.kind === 'hidden') {
+    hidePreview();
     return;
   }
 
@@ -90,7 +95,7 @@ const setPreview = (
 
   if (state.kind === 'image') {
     if (!(previewImg instanceof HTMLImageElement)) {
-      previewWrap.hidden = true;
+      hidePreview();
       return;
     }
 
@@ -102,18 +107,38 @@ const setPreview = (
         || (safePreviewSrc.startsWith('/') && !safePreviewSrc.startsWith('//'))
       )
     ) {
-      previewWrap.setAttribute('data-admin-images-preview-state', 'hidden');
-      previewWrap.hidden = true;
-      previewImg.removeAttribute('src');
-      previewImg.hidden = true;
-      if (previewPlaceholder instanceof HTMLElement) {
-        previewPlaceholder.textContent = '';
-        previewPlaceholder.hidden = true;
-      }
+      hidePreview();
       return;
     }
 
-    previewImg.src = safePreviewSrc;
+    // DOM sink 前的最后一道边界：用 URL 构造器重新解析，切断来自输入文本的污点数据流。
+    // 这里与上游校验是纵深防御，也让 CodeQL js/xss-through-dom 能识别该 sanitizer。
+    let reparsedPreviewSrc: string | null = null;
+    try {
+      if (safePreviewSrc.startsWith('https://')) {
+        const parsed = new URL(safePreviewSrc);
+        if (parsed.protocol === 'https:') {
+          reparsedPreviewSrc = parsed.toString();
+        }
+      } else {
+        const parsed = new URL(safePreviewSrc, window.location.origin);
+        if (
+          parsed.origin === window.location.origin
+          && parsed.protocol === window.location.protocol
+        ) {
+          reparsedPreviewSrc = `${parsed.pathname}${parsed.search}`;
+        }
+      }
+    } catch {
+      reparsedPreviewSrc = null;
+    }
+
+    if (!reparsedPreviewSrc) {
+      hidePreview();
+      return;
+    }
+
+    previewImg.src = reparsedPreviewSrc;
     previewImg.hidden = false;
     if (previewPlaceholder instanceof HTMLElement) {
       previewPlaceholder.textContent = '';
