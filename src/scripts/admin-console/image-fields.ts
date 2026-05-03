@@ -1,5 +1,4 @@
 import {
-  getAdminImageFieldPreviewSrc,
   getAdminRenderedImagePreviewSrc
 } from '../../lib/admin-console/image-params';
 import { formatAdminImageMetaSummary, type AdminImageClientItem } from '../admin-shared/image-client';
@@ -12,6 +11,7 @@ type StatusSetter = (
 ) => void;
 
 const base = import.meta.env.BASE_URL ?? '/';
+const META_PREVIEW_DEBOUNCE_MS = 360;
 
 type ThemeImageFieldConfig = {
   field: AdminImagePickerField;
@@ -58,9 +58,6 @@ const FIELD_CONFIGS: readonly ThemeImageFieldConfig[] = [
     pickerResetStatus: '已清空 Bits 默认头像'
   }
 ];
-
-const getPreviewSrc = (field: AdminImagePickerField, value: string): string | null =>
-  getAdminImageFieldPreviewSrc(field, value, base);
 
 const getDefaultPreviewSrc = (previewWrap: HTMLElement | null): string | null =>
   getAdminRenderedImagePreviewSrc(
@@ -190,12 +187,11 @@ export const createAdminThemeImageFields = ({
       return;
     }
 
-    const previewSrc = getPreviewSrc(field, value);
     setPreview(
       binding.previewWrap,
       binding.previewImg,
       binding.previewPlaceholder,
-      previewSrc ? { kind: 'image', src: previewSrc } : { kind: 'hidden' }
+      { kind: 'hidden' }
     );
 
     if (!picker) {
@@ -210,30 +206,60 @@ export const createAdminThemeImageFields = ({
       });
       if (binding.input.value.trim() !== value) return;
       if (getFieldState(field).enabled === false) return;
-      if (meta.previewSrc) {
-        setPreview(
-          binding.previewWrap,
-          binding.previewImg,
-          binding.previewPlaceholder,
-          { kind: 'image', src: meta.previewSrc }
-        );
-      }
+      setPreview(
+        binding.previewWrap,
+        binding.previewImg,
+        binding.previewPlaceholder,
+        meta.previewSrc ? { kind: 'image', src: meta.previewSrc } : { kind: 'hidden' }
+      );
       setMetaText(binding.metaEl, formatAdminImageMetaSummary(meta));
     } catch (error) {
       if (binding.input.value.trim() !== value) return;
       if (getFieldState(field).enabled === false) return;
+      setPreview(
+        binding.previewWrap,
+        binding.previewImg,
+        binding.previewPlaceholder,
+        { kind: 'hidden' }
+      );
       setMetaText(binding.metaEl, error instanceof Error ? error.message : '路径暂时无法读取');
     }
   };
 
   bindings.forEach((binding) => {
     if (!(binding.input instanceof HTMLInputElement)) return;
+    let metaTimer = 0;
+
+    const clearMetaTimer = () => {
+      window.clearTimeout(metaTimer);
+      metaTimer = 0;
+    };
+
+    const scheduleFieldUpdate = () => {
+      clearMetaTimer();
+      metaTimer = window.setTimeout(() => {
+        metaTimer = 0;
+        void updateField(binding.config.field);
+      }, META_PREVIEW_DEBOUNCE_MS);
+    };
+
+    const updateFieldNow = () => {
+      clearMetaTimer();
+      void updateField(binding.config.field);
+    };
 
     binding.input.addEventListener('input', () => {
       setMetaText(binding.metaEl, '等待确认路径并读取元数据');
+      setPreview(
+        binding.previewWrap,
+        binding.previewImg,
+        binding.previewPlaceholder,
+        { kind: 'hidden' }
+      );
+      scheduleFieldUpdate();
     });
     binding.input.addEventListener('change', () => {
-      void updateField(binding.config.field);
+      updateFieldNow();
     });
 
     binding.button?.addEventListener('click', () => {
@@ -281,7 +307,7 @@ export const createAdminThemeImageFields = ({
       });
     });
 
-    void updateField(binding.config.field);
+    updateFieldNow();
   });
 
   return {

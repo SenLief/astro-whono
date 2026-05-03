@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and this project aims to follow Semantic Versioning.
 
 
-## [Unreleased]
+## [0.4.1] - 2026-05-03
+
+### Changed
+- Theme Console 与内容编辑中的图片预览改为经图片元数据接口确认后显示，并对手动输入做防抖处理。
+- 优化图片选择器的实时搜索体验。
+
+### Fixed
+- 修复 `essay.date` 不再兼容 ISO 8601 datetime 的问题，旧内容无需批量迁移即可继续构建。
+- 修复后台图片预览直接使用表单输入路径时可能触发安全扫描告警的问题。
+- 修复 Hero 图片、Bits 配图和 Bits 默认头像在元数据读取时规则不一致的问题，字段预览现在与前台展示规则保持一致。
+- 修复 Theme Console 中 Hero 图片路径留空时默认预览图可能不显示的问题。
 
 ## [0.4.0] - 2026-04-28
 

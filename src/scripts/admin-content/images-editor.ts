@@ -1,4 +1,3 @@
-import { getAdminImageFieldPreviewSrc } from '../../lib/admin-console/image-params';
 import { formatAdminImageMetaSummary } from '../admin-shared/image-client';
 import type { AdminImagePickerController } from '../admin-shared/image-picker';
 
@@ -35,7 +34,7 @@ type ImageRowRefs = {
   heightError: HTMLElement | null;
 };
 
-const base = import.meta.env.BASE_URL ?? '/';
+const META_PREVIEW_DEBOUNCE_MS = 360;
 
 const getRowRefs = (row: HTMLElement): ImageRowRefs => ({
   row,
@@ -57,11 +56,7 @@ const getRowRefs = (row: HTMLElement): ImageRowRefs => ({
   heightError: row.querySelector<HTMLElement>('[data-field-error$=".height"]')
 });
 
-const getPreviewSrc = (value: string): string | null =>
-  getAdminImageFieldPreviewSrc('bits.images', value, base);
-
-const setPreview = (refs: ImageRowRefs, value: string) => {
-  const previewSrc = getPreviewSrc(value);
+const setPreview = (refs: ImageRowRefs, previewSrc: string | null) => {
   if (!(refs.previewWrap instanceof HTMLElement) || !(refs.previewImg instanceof HTMLImageElement)) return;
   if (!previewSrc) {
     refs.previewWrap.hidden = true;
@@ -144,7 +139,7 @@ export const initAdminContentBitsImagesEditor = ({
   const applyMeta = async (refs: ImageRowRefs) => {
     clearRowErrors(refs);
     const value = refs.srcInput?.value.trim() ?? '';
-    setPreview(refs, value);
+    setPreview(refs, null);
     if (!value) {
       setMeta(refs, '等待选择图片或输入路径');
       return;
@@ -158,6 +153,7 @@ export const initAdminContentBitsImagesEditor = ({
       const meta = await picker.readMeta({ field: 'bits.images', value });
       if ((refs.srcInput?.value.trim() ?? '') !== value) return;
       setMeta(refs, formatAdminImageMetaSummary(meta));
+      setPreview(refs, meta.previewSrc);
       if (meta.kind === 'local' && refs.widthInput && refs.heightInput) {
         if (meta.width) refs.widthInput.value = String(meta.width);
         if (meta.height) refs.heightInput.value = String(meta.height);
@@ -172,27 +168,54 @@ export const initAdminContentBitsImagesEditor = ({
 
   const bindRow = (row: HTMLElement) => {
     const refs = getRowRefs(row);
+    let metaTimer = 0;
+
+    const clearMetaTimer = () => {
+      window.clearTimeout(metaTimer);
+      metaTimer = 0;
+    };
+
+    const scheduleMetaPreview = () => {
+      clearMetaTimer();
+      metaTimer = window.setTimeout(() => {
+        metaTimer = 0;
+        void applyMeta(refs);
+      }, META_PREVIEW_DEBOUNCE_MS);
+    };
+
+    const applyMetaNow = () => {
+      clearMetaTimer();
+      void applyMeta(refs);
+    };
 
     refs.srcInput?.addEventListener('input', () => {
       clearRowErrors(refs);
-      setPreview(refs, refs.srcInput?.value ?? '');
+      setPreview(refs, null);
+      setMeta(
+        refs,
+        (refs.srcInput?.value.trim() ?? '')
+          ? '等待确认路径并读取元数据'
+          : '等待选择图片或输入路径'
+      );
       syncHiddenInput();
+      scheduleMetaPreview();
     });
     refs.srcInput?.addEventListener('change', () => {
-      void applyMeta(refs);
+      applyMetaNow();
     });
     refs.widthInput?.addEventListener('input', syncHiddenInput);
     refs.heightInput?.addEventListener('input', syncHiddenInput);
     refs.altInput?.addEventListener('input', syncHiddenInput);
 
     refs.removeBtn?.addEventListener('click', () => {
+      clearMetaTimer();
       const rows = editor.querySelectorAll<HTMLElement>('[data-admin-content-image-row]');
       if (rows.length <= 1) {
         refs.srcInput && (refs.srcInput.value = '');
         refs.widthInput && (refs.widthInput.value = '');
         refs.heightInput && (refs.heightInput.value = '');
         refs.altInput && (refs.altInput.value = '');
-        setPreview(refs, '');
+        setPreview(refs, null);
         setMeta(refs, '等待选择图片或输入路径');
       } else {
         row.remove();
@@ -214,7 +237,7 @@ export const initAdminContentBitsImagesEditor = ({
           if (refs.srcInput) refs.srcInput.value = item.value;
           if (refs.widthInput && item.width) refs.widthInput.value = String(item.width);
           if (refs.heightInput && item.height) refs.heightInput.value = String(item.height);
-          setPreview(refs, item.value);
+          setPreview(refs, item.previewSrc);
           setMeta(refs, formatAdminImageMetaSummary({ kind: 'local', origin: item.origin, width: item.width, height: item.height, size: item.size }));
           syncHiddenInput();
           setStatus('ok', `已选择本地图片：${item.value}`);
@@ -222,9 +245,9 @@ export const initAdminContentBitsImagesEditor = ({
       });
     });
 
-    setPreview(refs, refs.srcInput?.value ?? '');
+    setPreview(refs, null);
     if ((refs.srcInput?.value ?? '').trim()) {
-      void applyMeta(refs);
+      applyMetaNow();
     } else {
       setMeta(refs, '等待选择图片或输入路径');
     }

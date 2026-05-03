@@ -95,15 +95,21 @@ describe('admin-console/shared', () => {
 
   it('normalizes rendered admin image preview sources before assigning img src', () => {
     expect(getAdminRenderedImagePreviewSrc('/_astro/hero.hash.png', '/blog/')).toBe('/blog/_astro/hero.hash.png');
+    expect(getAdminRenderedImagePreviewSrc('/_astro/hero.hash.png?origWidth=1200&origHeight=800', '/blog/')).toBe(
+      '/blog/_astro/hero.hash.png?origWidth=1200&origHeight=800'
+    );
     expect(getAdminRenderedImagePreviewSrc('/blog/_astro/hero.hash.png', '/blog/')).toBe('/blog/_astro/hero.hash.png');
     expect(getAdminRenderedImagePreviewSrc('/@fs/D:/Server-Related/dev/astro-whono/src/assets/hero.png')).toBe(
       '/@fs/D:/Server-Related/dev/astro-whono/src/assets/hero.png'
+    );
+    expect(getAdminRenderedImagePreviewSrc('/@fs/D:/Server-Related/dev/astro-whono/src/assets/hero.png?origWidth=1200')).toBe(
+      '/@fs/D:/Server-Related/dev/astro-whono/src/assets/hero.png?origWidth=1200'
     );
     expect(getAdminRenderedImagePreviewSrc('https://example.com/hero.webp')).toBe('https://example.com/hero.webp');
     expect(getAdminRenderedImagePreviewSrc('http://example.com/hero.webp')).toBeNull();
     expect(getAdminRenderedImagePreviewSrc('data:image/png;base64,hero.png')).toBeNull();
     expect(getAdminRenderedImagePreviewSrc('//example.com/hero.webp')).toBeNull();
-    expect(getAdminRenderedImagePreviewSrc('/_astro/hero.svg?x=1')).toBeNull();
+    expect(getAdminRenderedImagePreviewSrc('/_astro/hero.hash.png#preview')).toBeNull();
   });
 
   it('tokenizes search query and builds normalized haystack text', () => {

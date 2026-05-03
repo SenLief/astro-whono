@@ -166,6 +166,10 @@ type LocalImageTarget = {
   previewSrc: string | null;
 };
 
+type FieldImageTarget =
+  | { kind: 'local'; target: LocalImageTarget }
+  | { kind: 'remote'; url: string };
+
 type AdminImageInspectionMeta = Pick<AdminImageMetaResult, 'width' | 'height' | 'size' | 'mimeType'>;
 
 type AdminImageShortCacheEntry<T> = {
@@ -956,7 +960,7 @@ const readLocalImageMeta = async (target: LocalImageTarget): Promise<AdminImageM
   };
 };
 
-const resolveLocalTargetFromFieldValue = (field: AdminImageFieldContext, rawValue: string): LocalImageTarget | null => {
+const resolveFieldImageTarget = (field: AdminImageFieldContext, rawValue: string): FieldImageTarget => {
   const value = rawValue.trim();
   if (!value) {
     throw new AdminImageError('图片值为空，无法读取元数据');
@@ -964,7 +968,7 @@ const resolveLocalTargetFromFieldValue = (field: AdminImageFieldContext, rawValu
 
   if (field === 'bits.images') {
     const safeRemoteUrl = toSafeHttpUrl(value);
-    if (safeRemoteUrl && safeRemoteUrl.startsWith('https://')) return null;
+    if (safeRemoteUrl.startsWith('https://')) return { kind: 'remote', url: safeRemoteUrl };
 
     const normalized = normalizeAdminLocalImageSource(value);
     if (!normalized) {
@@ -972,10 +976,13 @@ const resolveLocalTargetFromFieldValue = (field: AdminImageFieldContext, rawValu
     }
 
     return {
-      path: `public/${normalized}`,
-      value: normalized,
-      origin: 'public',
-      previewSrc: `/${normalized}`
+      kind: 'local',
+      target: {
+        path: `public/${normalized}`,
+        value: normalized,
+        origin: 'public',
+        previewSrc: `/${normalized}`
+      }
     };
   }
 
@@ -986,19 +993,22 @@ const resolveLocalTargetFromFieldValue = (field: AdminImageFieldContext, rawValu
     }
 
     return {
-      path: getBitsAvatarLocalFilePath(normalized) ?? `public/${normalized}`,
-      value: normalized,
-      origin: 'public',
-      previewSrc: `/${normalized}`
+      kind: 'local',
+      target: {
+        path: getBitsAvatarLocalFilePath(normalized) ?? `public/${normalized}`,
+        value: normalized,
+        origin: 'public',
+        previewSrc: `/${normalized}`
+      }
     };
   }
 
   const normalized = normalizeHeroImageSrc(value);
   if (!normalized) {
-    throw new AdminImageError('Hero 图片地址为空，无法读取元数据');
+    throw new AdminImageError('Hero 图片只允许 src/assets/**、public 路径或 https:// 远程 URL');
   }
 
-  if (/^https?:\/\//i.test(normalized)) return null;
+  if (normalized.startsWith('https://')) return { kind: 'remote', url: normalized };
 
   const localPath = getHeroImageLocalFilePath(normalized);
   if (!localPath) {
@@ -1006,10 +1016,13 @@ const resolveLocalTargetFromFieldValue = (field: AdminImageFieldContext, rawValu
   }
 
   return {
-    path: localPath,
-    value: normalized,
-    origin: localPath.startsWith('public/') ? 'public' : 'src/assets',
-    previewSrc: getPreviewSrcFromPath(localPath)
+    kind: 'local',
+    target: {
+      path: localPath,
+      value: normalized,
+      origin: localPath.startsWith('public/') ? 'public' : 'src/assets',
+      previewSrc: getPreviewSrcFromPath(localPath)
+    }
   };
 };
 
@@ -1075,37 +1088,22 @@ export const getAdminImageMeta = async (input: AdminImageMetaInput): Promise<Adm
     throw new AdminImageError('缺少图片值，无法读取元数据');
   }
 
-  const safeRemoteUrl = toSafeHttpUrl(rawValue);
-  if (safeRemoteUrl && /^https?:\/\//i.test(safeRemoteUrl)) {
+  const fieldTarget = resolveFieldImageTarget(input.field, rawValue);
+  if (fieldTarget.kind === 'remote') {
     return {
       kind: 'remote',
       path: null,
-      value: safeRemoteUrl,
+      value: fieldTarget.url,
       origin: null,
       width: null,
       height: null,
       size: null,
       mimeType: null,
-      previewSrc: safeRemoteUrl
+      previewSrc: fieldTarget.url
     };
   }
 
-  const localTarget = resolveLocalTargetFromFieldValue(input.field, rawValue);
-  if (!localTarget) {
-    return {
-      kind: 'remote',
-      path: null,
-      value: rawValue,
-      origin: null,
-      width: null,
-      height: null,
-      size: null,
-      mimeType: null,
-      previewSrc: rawValue
-    };
-  }
-
-  return readLocalImageMeta(localTarget);
+  return readLocalImageMeta(fieldTarget.target);
 };
 
 export const listAdminImageItems = async ({

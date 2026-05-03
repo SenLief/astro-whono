@@ -80,7 +80,6 @@
 
 .admin-images-picker::backdrop {
   background: rgba(16, 22, 28, 0.58);
-  backdrop-filter: blur(6px);
 }
 
 .admin-images-picker__surface {
@@ -287,14 +286,19 @@
 
 .admin-images-picker__results {
   display: grid;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   gap: 12px;
+  block-size: clamp(340px, 62vh, 680px);
   min-height: 0;
   margin: 0 12px 0 22px;
   padding: 14px var(--admin-images-picker-results-scroll-gap) 14px 0;
   list-style: none;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.admin-images-picker__results[data-loading='true'] {
+  opacity: 0.72;
 }
 
 .admin-images-picker__empty {
@@ -676,6 +680,7 @@
   }
 
   .admin-images-picker__results {
+    block-size: clamp(300px, 58vh, 620px);
     margin: 0 8px 0 16px;
   }
 

@@ -44,6 +44,7 @@ const ADMIN_IMAGE_PICKER_PAGE_LIMITS = {
   list: 6,
   grid: 12
 } as const satisfies Record<AdminImagePickerViewMode, number>;
+const ADMIN_IMAGE_PICKER_SEARCH_DEBOUNCE_MS = 260;
 
 const formatAdminImageGridMetaSummary = (
   item: Pick<AdminImageClientItem, 'width' | 'height' | 'size'>
@@ -176,6 +177,7 @@ export const createAdminImagePicker = (root: ParentNode = document): AdminImageP
   let filterPanelOpen = false;
   let currentPage = 1;
   let totalPages = 1;
+  let listLoading = false;
   let requestToken = 0;
   let searchTimer = 0;
   let focusTimer = 0;
@@ -222,7 +224,14 @@ export const createAdminImagePicker = (root: ParentNode = document): AdminImageP
   };
 
   const syncConfirmAction = () => {
-    confirmBtn.disabled = !selectedItem;
+    confirmBtn.disabled = listLoading || !selectedItem;
+  };
+
+  const setResultsLoading = (loading: boolean) => {
+    listLoading = loading;
+    resultsEl.dataset.loading = String(loading);
+    resultsEl.setAttribute('aria-busy', String(loading));
+    syncConfirmAction();
   };
 
   const syncSelectedItemFromCurrentItems = () => {
@@ -437,12 +446,9 @@ export const createAdminImagePicker = (root: ParentNode = document): AdminImageP
     if (!currentOptions) return;
 
     const token = ++requestToken;
+    setResultsLoading(true);
     resetResultsScroll();
     setStatus('加载中…');
-    currentItems = [];
-    currentTotalCount = 0;
-    syncSelectedItemFromCurrentItems();
-    resultsEl.replaceChildren();
 
     const params = new URLSearchParams({
       field: currentOptions.field,
@@ -474,6 +480,10 @@ export const createAdminImagePicker = (root: ParentNode = document): AdminImageP
       syncPager();
       resultsEl.replaceChildren();
       setStatus(error instanceof Error ? error.message : '加载失败');
+    } finally {
+      if (token === requestToken) {
+        setResultsLoading(false);
+      }
     }
   };
 
@@ -502,6 +512,7 @@ export const createAdminImagePicker = (root: ParentNode = document): AdminImageP
     filterPanelOpen = false;
     currentPage = 1;
     totalPages = 1;
+    setResultsLoading(false);
     titleEl.textContent = options.title;
 
     const description = options.description?.trim() ?? '';
@@ -516,6 +527,7 @@ export const createAdminImagePicker = (root: ParentNode = document): AdminImageP
     queryInput.value = options.query?.trim() ?? '';
     resetBtn.textContent = options.resetLabel?.trim() || '恢复默认';
     resetBtn.hidden = typeof options.onReset !== 'function';
+    resultsEl.replaceChildren();
     syncViewMode();
     syncFilterControls();
     syncPager();
@@ -582,7 +594,7 @@ export const createAdminImagePicker = (root: ParentNode = document): AdminImageP
       if (!dialog.open) return;
       currentPage = 1;
       void loadList();
-    }, 180);
+    }, ADMIN_IMAGE_PICKER_SEARCH_DEBOUNCE_MS);
   });
 
   listViewBtn.addEventListener('click', () => {

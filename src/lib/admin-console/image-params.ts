@@ -239,20 +239,23 @@ const withAdminPreviewBase = (base: string, path: string): string => {
   return `${basePath}${normalizedPath}`;
 };
 
-const normalizeRenderedLocalImagePreviewPath = (value: string): string | null => {
+const normalizeRenderedLocalImagePreviewPath = (value: string): { path: string; search: string } | null => {
   const normalized = value.trim().replace(/\\/g, '/').replace(/^\.\/+/, '');
   if (
     !normalized
     || !normalized.startsWith('/')
     || normalized.startsWith('//')
-    || /(^|\/)\.\.(?:\/|$)/.test(normalized)
-    || normalized.includes('?')
     || normalized.includes('#')
   ) {
     return null;
   }
 
-  return IMAGE_LOCAL_EXT_RE.test(normalized) ? normalized : null;
+  const searchIndex = normalized.indexOf('?');
+  const pathPart = searchIndex === -1 ? normalized : normalized.slice(0, searchIndex);
+  const search = searchIndex === -1 ? '' : normalized.slice(searchIndex);
+  if (!pathPart || /(^|\/)\.\.(?:\/|$)/.test(pathPart)) return null;
+
+  return IMAGE_LOCAL_EXT_RE.test(pathPart) ? { path: pathPart, search } : null;
 };
 
 export const getAdminRenderedImagePreviewSrc = (value: string, base = '/'): string | null => {
@@ -260,7 +263,7 @@ export const getAdminRenderedImagePreviewSrc = (value: string, base = '/'): stri
   if (safeRemoteUrl.startsWith('https://')) return safeRemoteUrl;
 
   const localPath = normalizeRenderedLocalImagePreviewPath(value);
-  return localPath ? withAdminPreviewBase(base, localPath) : null;
+  return localPath ? `${withAdminPreviewBase(base, localPath.path)}${localPath.search}` : null;
 };
 
 export const getAdminImageFieldPreviewSrc = (

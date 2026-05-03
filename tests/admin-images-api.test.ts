@@ -163,8 +163,41 @@ describe('admin images api', () => {
     const remotePayload = JSON.parse(await remoteResponse.text());
     expect(remotePayload.ok).toBe(true);
     expect(remotePayload.result.kind).toBe('remote');
+    expect(remotePayload.result.previewSrc).toBe('https://example.com/demo.webp');
     expect(remotePayload.result.width).toBeNull();
     expect(remotePayload.result.height).toBeNull();
+  });
+
+  it('rejects metadata previews that violate field image contracts', async () => {
+    const { GET } = await import('../src/pages/api/admin/images/meta');
+
+    const cases = [
+      {
+        field: 'bits.images',
+        value: 'http://example.com/demo.webp'
+      },
+      {
+        field: 'home.heroImageSrc',
+        value: 'http://example.com/hero.webp'
+      },
+      {
+        field: 'page.bits.defaultAuthor.avatar',
+        value: 'https://example.com/avatar.webp'
+      }
+    ];
+
+    for (const { field, value } of cases) {
+      const response = await GET({
+        url: new URL(
+          `http://127.0.0.1:4321/api/admin/images/meta?field=${field}&value=${encodeURIComponent(value)}`
+        )
+      } as never);
+      const payload = JSON.parse(await response.text());
+
+      expect(response.status).toBe(400);
+      expect(payload.ok).toBe(false);
+      expect(Array.isArray(payload.errors)).toBe(true);
+    }
   });
 
   it('returns metadata for canonical local path values and rejects unsafe path traversal', async () => {
