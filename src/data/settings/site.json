@@ -4,8 +4,7 @@
   "defaultLocale": "zh-CN",
   "footer": {
     "startYear": 2025,
-    "showCurrentYear": true,
-    "copyright": "Whono · Theme Demo · by cxro"
+    "showCurrentYear": true
   },
   "adminOverview": {
     "publicVisible": true,
